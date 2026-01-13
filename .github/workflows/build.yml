@@ -111,6 +111,19 @@ jobs:
             sleep 10
           done
 
+      - name: Upgrade Golang
+        working-directory: ./sdk
+        run: |
+          # Upgrade golang package from upstream master to support containerd 2.2.0 (requires Go 1.24+)
+          rm -rf feeds/packages/lang/golang
+          svn export https://github.com/openwrt/packages/trunk/lang/golang feeds/packages/lang/golang || \
+            (git clone --depth 1 --filter=blob:none --sparse https://github.com/openwrt/packages.git tmp_packages && \
+             cd tmp_packages && git sparse-checkout set lang/golang && cd .. && \
+             mv tmp_packages/lang/golang feeds/packages/lang/ && rm -rf tmp_packages)
+          
+          # Install the updated golang package
+          ./scripts/feeds install -f golang
+
       - name: Automate Version Updates
         working-directory: ./sdk
         env:
@@ -220,7 +233,6 @@ jobs:
           
           # Containerd
           update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
-
       - name: Register Packages
         working-directory: ./sdk
         run: |
