@@ -155,21 +155,6 @@ jobs:
             sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
             sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
             sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
-            
-            # FIX: Force SKIP checksums (prevents 'cannot find hash command' error)
-            # We remove existing lines and append the explicit 'skip' instruction
-            sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE
-            sed -i "/^PKG_HASH:=/d" $MAKEFILE
-            echo "PKG_MIRROR_HASH:=skip" >> $MAKEFILE
-            echo "PKG_HASH:=skip" >> $MAKEFILE
-            
-            # FIX: Disable Go Module Hash Check
-            sed -i "/^GO_PKG_MOD_HASH:=/d" $MAKEFILE
-            sed -i "/^GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK/d" $MAKEFILE
-            echo "GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK:=0" >> $MAKEFILE
-            
-            # Remove Date (conflicts with hash/version bumps sometimes)
-            sed -i "/^PKG_SOURCE_DATE:=/d" $MAKEFILE
           }
 
           # --- 1. GET DATA ---
