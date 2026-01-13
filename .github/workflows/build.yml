@@ -55,7 +55,17 @@ jobs:
           echo "url=${BASE_URL}${SDK_FILE}" >> $GITHUB_OUTPUT
           echo "filename=$SDK_FILE" >> $GITHUB_OUTPUT
 
+      - name: Cache SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: sdk
+          key: ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ steps.sdk_config.outputs.filename }}
+          restore-keys: |
+            ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
+
       - name: Download and Setup SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
           mkdir sdk
@@ -68,6 +78,14 @@ jobs:
           git config --global http.postBuffer 524288000
           git config --global http.lowSpeedLimit 0
           git config --global http.lowSpeedTime 999999  # Effectively disable timeout
+
+      - name: Cache Feeds
+        uses: actions/cache@v4
+        with:
+          path: sdk/feeds
+          key: ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}
+          restore-keys: |
+            ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-
 
       - name: Update and install feeds with retry
         working-directory: ./sdk
@@ -183,6 +201,18 @@ jobs:
         working-directory: ./sdk
         run: |
           ./scripts/feeds install docker dockerd containerd runc
+
+      - name: Cache Build Artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            sdk/build_dir
+            sdk/staging_dir
+            sdk/dl
+          key: ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
+            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-
 
       - name: Compile Packages
         working-directory: ./sdk
