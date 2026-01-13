@@ -3,6 +3,6 @@ cache/
 output/
 sdk/
 sdk.archive
-
+feeds/
 # Temporary build files
 tmp_packages/

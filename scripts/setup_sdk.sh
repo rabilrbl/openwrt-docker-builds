@@ -48,10 +48,10 @@ fi
 if [ ! -f "sdk/rules.mk" ]; then
     echo "Downloading SDK..."
     
-    # Clean up potentially empty directory from mount, but PRESERVE dl if it exists (as it is a mount)
+    # Clean up potentially empty directory from mount, but PRESERVE dl and feeds if they exist
     # If sdk dir exists, clean it carefully
     if [ -d "sdk" ]; then
-        find sdk -mindepth 1 -maxdepth 1 -not -name 'dl' -exec rm -rf {} +
+        find sdk -mindepth 1 -maxdepth 1 -not -name 'dl' -not -name 'feeds' -exec rm -rf {} +
     else
         mkdir -p sdk
     fi
