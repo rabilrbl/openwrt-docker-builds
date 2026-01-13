@@ -8,10 +8,20 @@ This repository includes a test framework to simulate the GitHub Actions build p
 
 ## How to Run
 
-Use the `test-docker.sh` script to trigger a build.
+Use the `test-docker.sh` script to trigger a build. This script automatically handles caching to speed up subsequent builds.
 
 ```bash
 ./test-docker.sh [OPENWRT_VERSION] [TARGET]
+```
+
+### Caching
+The script creates a `cache/` directory in your project root:
+- `cache/dl`: Stores downloaded source tarballs. Shared across all builds.
+- `cache/sdk-<version>-<target>`: Stores the unpacked SDK and build artifacts for each specific target.
+
+To force a clean build, delete the relevant cache directory:
+```bash
+rm -rf cache/sdk-snapshot-bcm27xx-bcm2712
 ```
 
 ### Examples

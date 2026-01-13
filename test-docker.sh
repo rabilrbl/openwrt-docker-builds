@@ -6,23 +6,37 @@ TARGET="${2:-bcm27xx/bcm2712}"
 
 IMAGE_NAME="openwrt-docker-builder"
 
+# Sanitize inputs for directory names
+SAFE_VERSION=${OPENWRT_VERSION//\//-}
+SAFE_TARGET=${TARGET//\//-}
+
+CACHE_DIR="$(pwd)/cache"
+SDK_CACHE_DIR="${CACHE_DIR}/sdk-${SAFE_VERSION}-${SAFE_TARGET}"
+DL_CACHE_DIR="${CACHE_DIR}/dl"
+
 echo "Building Docker image..."
 docker build -t $IMAGE_NAME -f Dockerfile.test .
+
+echo "Preparing Cache..."
+mkdir -p "$SDK_CACHE_DIR"
+mkdir -p "$DL_CACHE_DIR"
+
+# Ensure permissions so container user can write
+chmod 777 "$SDK_CACHE_DIR"
+chmod 777 "$DL_CACHE_DIR"
 
 echo "Running build container..."
 echo "  OpenWrt Version: $OPENWRT_VERSION"
 echo "  Target: $TARGET"
+echo "  Cache: $CACHE_DIR"
 
 mkdir -p output
 
-# Run the container
-# We mount the output directory to get the artifacts out
-# We DO NOT mount the SDK directory by default to ensure a clean build every time,
-# but for repeated testing it might be useful.
-# For this "test framework", clean state is safer.
-
+# Run the container with mounts
 docker run --rm \
     -v $(pwd)/output:/home/builder/output \
+    -v "$SDK_CACHE_DIR":/home/builder/sdk \
+    -v "$DL_CACHE_DIR":/home/builder/sdk/dl \
     $IMAGE_NAME \
     "$OPENWRT_VERSION" "$TARGET"
 

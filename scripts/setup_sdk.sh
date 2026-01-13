@@ -43,15 +43,21 @@ if [ "$MODE" == "resolve" ]; then
 fi
 
 # --- Setup SDK ---
-if [ ! -d "sdk" ]; then
+# Check if SDK is already populated (e.g. from cache)
+# We check for a key file like 'rules.mk'
+if [ ! -f "sdk/rules.mk" ]; then
     echo "Downloading SDK..."
+    
+    # Clean up potentially empty directory from mount
+    rm -rf sdk
+    mkdir -p sdk
+    
     wget -O sdk.archive "$SDK_URL"
-    mkdir sdk
     echo "Extracting SDK..."
     tar -I zstd -xf sdk.archive -C sdk --strip-components=1
     rm sdk.archive
 else
-    echo "SDK directory exists, skipping download."
+    echo "SDK found (cached), skipping download."
 fi
 
 cd sdk
