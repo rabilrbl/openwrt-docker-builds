@@ -8,7 +8,7 @@ if [ ! -f "scripts/feeds" ]; then
 fi
 
 echo "Installing targets..."
-./scripts/feeds install docker dockerd containerd runc
+./scripts/feeds install docker dockerd containerd runc luci-lib-docker
 make defconfig
 
 echo "Compiling Containerd..."
@@ -26,3 +26,6 @@ make package/runc/compile V=s
 
 echo "Compiling Docker Compose..."
 make package/docker-compose/compile V=s
+
+echo "Compiling luci-lib-docker..."
+make package/luci-lib-docker/compile V=s

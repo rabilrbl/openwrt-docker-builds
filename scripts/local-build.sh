@@ -34,5 +34,6 @@ find bin/packages -name "dockerd*.ipk" -exec cp {} ../output/ \;
 find bin/packages -name "containerd*.ipk" -exec cp {} ../output/ \;
 find bin/packages -name "runc*.ipk" -exec cp {} ../output/ \;
 find bin/packages -name "docker-compose*.ipk" -exec cp {} ../output/ \;
+find bin/packages -name "luci-lib-docker*.ipk" -exec cp {} ../output/ \;
 
 echo "Build complete! Artifacts are in output/"
