@@ -63,12 +63,26 @@ jobs:
           cd sdk
           sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
 
-      - name: Update Feeds
+      - name: Configure Git for large repositories
+        run: |
+          git config --global http.postBuffer 524288000
+          git config --global http.lowSpeedLimit 0
+          git config --global http.lowSpeedTime 999999
+
+      - name: Update and install feeds with retry
         working-directory: ./sdk
         run: |
-          ./scripts/feeds update -a
-          # Install basic dependencies definitions
-          ./scripts/feeds install -a -p packages
+          max_attempts=3
+          attempt=1
+          until ./scripts/feeds update -a && ./scripts/feeds install -a -p packages; do
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Failed after $max_attempts attempts"
+              exit 1
+            fi
+            echo "Feed operation failed, retrying (attempt $((attempt+1))/$max_attempts)..."
+            attempt=$((attempt+1))
+            sleep 10
+          done
 
       - name: Automate Version Updates
         working-directory: ./sdk
