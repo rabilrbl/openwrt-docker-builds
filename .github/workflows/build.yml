@@ -8,7 +8,7 @@ on:
 env:
   # Target: Raspberry Pi 5 (bcm27xx/bcm2712). 
   # For x86_64, use: https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.xz
-  SDK_URL: https://downloads.openwrt.org/snapshots/targets/bcm27xx/bcm2712/openwrt-sdk-bcm27xx-bcm2712_gcc-13.3.0_musl.Linux-x86_64.tar.xz
+  SDK_URL: https://downloads.openwrt.org/snapshots/targets/bcm27xx/bcm2712/openwrt-sdk-bcm27xx-bcm2712_gcc-14.3.0_musl.Linux-x86_64.tar.zst
   
 jobs:
   build:
