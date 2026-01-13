@@ -96,12 +96,7 @@ jobs:
             echo "Attempt $attempt of $max_attempts..."
             if ./scripts/feeds update -a; then
               echo "Feed update successful"
-              if ./scripts/feeds install -a -p packages; then
-                echo "Feed install successful"
-                exit 0
-              else
-                echo "Feed install failed"
-              fi
+              exit 0
             else
               echo "Feed update failed"
             fi
