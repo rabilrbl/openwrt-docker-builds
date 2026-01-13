@@ -148,3 +148,13 @@ if [ -f "$MAKEFILE_DIR/containerd/Makefile" ]; then
     echo "Patching containerd Makefile to remove legacy shims..."
     sed -i 's/containerd-shim,containerd-shim-runc-v1,//' "$MAKEFILE_DIR/containerd/Makefile"
 fi
+
+# Patch docker Makefile to find the correct binary (go build output path varies)
+if [ -f "$MAKEFILE_DIR/docker/Makefile" ]; then
+    echo "Patching docker Makefile to fix binary installation path..."
+    # Replace the fixed path with a find command to locate the binary (e.g. docker-linux-arm64)
+    # The original line looks like: $(INSTALL_BIN) $(PKG_BUILD_DIR)/build/docker $(1)/usr/bin/
+    # We replace it with: find $(PKG_BUILD_DIR) -name "docker-linux-*" -type f -exec $(INSTALL_BIN) {} $(1)/usr/bin/docker \;
+    # effectively ignoring the specific path structure.
+    sed -i 's|\$(INSTALL_BIN) \$(PKG_BUILD_DIR)/build/docker \$(1)/usr/bin/|find $(PKG_BUILD_DIR) -name "docker-linux-*" -type f -exec $(INSTALL_BIN) {} $(1)/usr/bin/docker \\;|' "$MAKEFILE_DIR/docker/Makefile"
+fi
