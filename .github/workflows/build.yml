@@ -1,0 +1,134 @@
+name: Build Latest Docker for OpenWrt
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * 5'  # Runs every Friday at Midnight (Weekly)
+
+env:
+  # Target: Raspberry Pi 5 (bcm27xx/bcm2712). 
+  # For x86_64, use: https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-sdk-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.xz
+  SDK_URL: https://downloads.openwrt.org/snapshots/targets/bcm27xx/bcm2712/openwrt-sdk-bcm27xx-bcm2712_gcc-13.3.0_musl.Linux-x86_64.tar.xz
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed for creating Releases
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
+            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils
+
+      - name: Download and Setup OpenWrt SDK
+        run: |
+          wget -O sdk.tar.xz $SDK_URL
+          mkdir sdk
+          tar -xJf sdk.tar.xz -C sdk --strip-components=1
+          cd sdk
+          # Disable package signing checks for CI
+          sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
+
+      - name: Update Feeds & Locate Packages
+        working-directory: ./sdk
+        run: |
+          ./scripts/feeds update -a
+          
+          # We need to install the packages to 'feeds/packages' so we can edit them
+          ./scripts/feeds install -a -p packages
+          
+          # Verify paths exist
+          ls -d feeds/packages/utils/docker
+          ls -d feeds/packages/utils/dockerd
+          ls -d feeds/packages/utils/containerd
+
+      - name: Automate Version Updates (The Magic Step)
+        working-directory: ./sdk
+        run: |
+          # Helper function to update a package
+          update_package() {
+            PKG_NAME=$1
+            REPO=$2
+            MAKEFILE_PATH=$3
+            
+            echo "--------------------------------------"
+            echo "Updating $PKG_NAME from $REPO..."
+            
+            # Get latest tag (removing 'v' prefix if needed for versioning)
+            LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            VERSION=${LATEST_TAG#v}
+            
+            # Get full commit hash for that tag
+            COMMIT_HASH=$(curl -s "https://api.github.com/repos/$REPO/git/ref/tags/$LATEST_TAG" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+            
+            echo "Latest Version: $VERSION"
+            echo "Commit Hash: $COMMIT_HASH"
+            
+            # Update Makefile
+            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" $MAKEFILE_PATH
+            sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$COMMIT_HASH/" $MAKEFILE_PATH
+            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE_PATH
+            
+            # Clear old hashes to force re-download/re-hash (crucial!)
+            sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE_PATH
+            sed -i "/^PKG_HASH:=/d" $MAKEFILE_PATH
+            
+            echo "Updated $MAKEFILE_PATH"
+          }
+
+          # 1. Update Docker CLI
+          update_package "docker" "docker/cli" "feeds/packages/utils/docker/Makefile"
+          
+          # 2. Update Dockerd (Moby)
+          update_package "dockerd" "moby/moby" "feeds/packages/utils/dockerd/Makefile"
+          
+          # 3. Update Containerd
+          update_package "containerd" "containerd/containerd" "feeds/packages/utils/containerd/Makefile"
+
+      - name: Install Updated Packages
+        working-directory: ./sdk
+        run: |
+          ./scripts/feeds install docker dockerd containerd
+
+      - name: Compile Packages
+        working-directory: ./sdk
+        run: |
+          make defconfig
+          
+          # Compile sequentially to avoid resource contention
+          # IGNORE_ERRORS=1 allows build to continue if one fails (optional)
+          echo "Compiling containerd..."
+          make package/containerd/compile V=s
+          
+          echo "Compiling dockerd..."
+          make package/dockerd/compile V=s
+          
+          echo "Compiling docker..."
+          make package/docker/compile V=s
+
+      - name: Collect Artifacts
+        run: |
+          mkdir -p output
+          find sdk/bin/packages -name "docker*.ipk" -exec cp {} output/ \;
+          find sdk/bin/packages -name "dockerd*.ipk" -exec cp {} output/ \;
+          find sdk/bin/packages -name "containerd*.ipk" -exec cp {} output/ \;
+          find sdk/bin/packages -name "runc*.ipk" -exec cp {} output/ \;
+          ls -l output/
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: "weekly-${{ github.run_number }}"
+          name: "Weekly Docker Build ${{ github.run_number }}"
+          files: output/*.ipk
+          body: |
+             Automatic build of latest Docker packages for OpenWrt.
+             Target: Raspberry Pi 5 (bcm27xx)
+             Date: ${{ steps.date.outputs.date }}
