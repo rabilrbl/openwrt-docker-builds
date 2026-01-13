@@ -179,3 +179,11 @@ if [ -f "$MAKEFILE_DIR/docker/Makefile" ]; then
     # effectively ignoring the specific path structure.
     sed -i 's|\$(INSTALL_BIN) \$(PKG_BUILD_DIR)/build/docker \$(1)/usr/bin/|find $(PKG_BUILD_DIR) -name "docker-linux-*" -type f -exec $(INSTALL_BIN) {} $(1)/usr/bin/docker \\;|' "$MAKEFILE_DIR/docker/Makefile"
 fi
+
+# Patch dockerd Makefile to add kmod-ipt-raw dependency (needed for Docker networking)
+if [ -f "$MAKEFILE_DIR/dockerd/Makefile" ]; then
+    echo "Patching dockerd Makefile to add kmod-ipt-raw dependency..."
+    if ! grep -q "kmod-ipt-raw" "$MAKEFILE_DIR/dockerd/Makefile"; then
+        sed -i '/+iptables \\/a \    +kmod-ipt-raw \\' "$MAKEFILE_DIR/dockerd/Makefile"
+    fi
+fi
