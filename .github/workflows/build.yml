@@ -2,11 +2,23 @@ name: Build Latest Docker for OpenWrt
 
 on:
   workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: 'OpenWrt Version (e.g., "snapshot" or "24.10.0")'
+        required: true
+        default: 'snapshot'
+      target:
+        description: 'Target Architecture'
+        required: true
+        default: 'bcm27xx/bcm2712'
+
   schedule:
     - cron: '0 0 * * 5'  # Weekly on Fridays
 
 env:
-  TARGET_URL: https://downloads.openwrt.org/snapshots/targets/bcm27xx/bcm2712/
+  # Default to snapshot if triggered via schedule
+  OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || 'snapshot' }}
+  TARGET: ${{ github.event.inputs.target || 'bcm27xx/bcm2712' }}
 
 jobs:
   build:
@@ -24,42 +36,49 @@ jobs:
           sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
             zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd
 
-      - name: Resolve Dynamic SDK URL
-        id: sdk
+      - name: Resolve SDK URL
+        id: sdk_config
         run: |
-          # 1. Fetch the HTML listing
-          # 2. Grep for the SDK file (looking for 'openwrt-sdk' and 'Linux-x86_64')
-          # 3. Extract just the filename
-          SDK_FILE=$(curl -sL ${{ env.TARGET_URL }} | grep -o 'href="openwrt-sdk-[^"]*Linux-x86_64.tar.[a-z]*"' | cut -d'"' -f2 | head -n 1)
+          # 1. Determine Base URL
+          if [ "${{ env.OPENWRT_VERSION }}" == "snapshot" ]; then
+            BASE_URL="https://downloads.openwrt.org/snapshots/targets/${{ env.TARGET }}/"
+          else
+            BASE_URL="https://downloads.openwrt.org/releases/${{ env.OPENWRT_VERSION }}/targets/${{ env.TARGET }}/"
+          fi
+          
+          echo "Looking for SDK in: $BASE_URL"
+          
+          # 2. Scrape filename (supports .tar.xz and .tar.zst)
+          # We look for a file starting with 'openwrt-sdk' and ending with 'Linux-x86_64.tar.*'
+          SDK_FILE=$(curl -sL "$BASE_URL" | grep -o 'href="openwrt-sdk-[^"]*Linux-x86_64.tar\.[a-z]*"' | cut -d'"' -f2 | head -n 1)
           
           if [ -z "$SDK_FILE" ]; then
-            echo "::error::Could not find SDK file in ${{ env.TARGET_URL }}"
+            echo "::error::Could not find SDK file at $BASE_URL"
             exit 1
           fi
 
           echo "Found SDK: $SDK_FILE"
-          echo "url=${{ env.TARGET_URL }}${SDK_FILE}" >> $GITHUB_OUTPUT
+          echo "url=${BASE_URL}${SDK_FILE}" >> $GITHUB_OUTPUT
           echo "filename=$SDK_FILE" >> $GITHUB_OUTPUT
 
-      - name: Download and Setup OpenWrt SDK
+      - name: Download and Setup SDK
         run: |
-          wget -O sdk.archive ${{ steps.sdk.outputs.url }}
-          
+          wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
           mkdir sdk
-          # Handle both .tar.xz and .tar.zst automatically
+          # Decompress (auto-detects zst/xz)
           tar -I zstd -xf sdk.archive -C sdk --strip-components=1
           
           cd sdk
-          # Disable signature checks for CI
+          # Disable signature check
           sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
 
-      - name: Update Feeds & Locate Packages
+      - name: Update Feeds
         working-directory: ./sdk
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a -p packages
           
-          # Verify paths
+          # Debug: verify folders exist
           ls -d feeds/packages/utils/docker
           ls -d feeds/packages/utils/dockerd
           ls -d feeds/packages/utils/containerd
@@ -67,40 +86,69 @@ jobs:
       - name: Automate Version Updates
         working-directory: ./sdk
         run: |
-          update_package() {
+          # --- HELPER FUNCTION ---
+          update_makefile() {
             PKG_NAME=$1
-            REPO=$2
-            MAKEFILE_PATH=$3
+            NEW_VERSION=$2
+            NEW_HASH=$3
+            MAKEFILE=$4
             
-            echo "Updating $PKG_NAME..."
+            echo "Updating $PKG_NAME -> $NEW_VERSION ($NEW_HASH)"
             
-            # Fetch Latest Tag
-            LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            VERSION=${LATEST_TAG#v}
+            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
+            sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
+            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
             
-            # Fetch Commit Hash
-            COMMIT_HASH=$(curl -s "https://api.github.com/repos/$REPO/git/ref/tags/$LATEST_TAG" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+            # Clear old hashes
+            sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE
+            sed -i "/^PKG_HASH:=/d" $MAKEFILE
             
-            echo "  Version: $VERSION"
-            echo "  Hash: $COMMIT_HASH"
-            
-            # Apply Changes
-            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VERSION/" $MAKEFILE_PATH
-            sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$COMMIT_HASH/" $MAKEFILE_PATH
-            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE_PATH
-            
-            # Remove old checksums to force re-verification
-            sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE_PATH
-            sed -i "/^PKG_HASH:=/d" $MAKEFILE_PATH
-            
-            # FIX: Disable Go Module Hash Check (Prevents build failure on version bump)
-            sed -i "/^GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK/d" $MAKEFILE_PATH
-            echo "GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK:=0" >> $MAKEFILE_PATH
+            # Disable Go Mod Hash Check
+            sed -i "/^GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK/d" $MAKEFILE
+            echo "GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK:=0" >> $MAKEFILE
           }
 
-          update_package "docker" "docker/cli" "feeds/packages/utils/docker/Makefile"
-          update_package "dockerd" "moby/moby" "feeds/packages/utils/dockerd/Makefile"
-          update_package "containerd" "containerd/containerd" "feeds/packages/utils/containerd/Makefile"
+          # --- 1. GET LATEST DOCKER ENGINE (Moby) VERSION ---
+          # We use this as the "Source of Truth" for the version number.
+          
+          # Fetch tag from GitHub API
+          RAW_TAG=$(curl -s "https://api.github.com/repos/moby/moby/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          
+          # Clean Version: Remove 'v', 'docker-v', etc.
+          # Example: "docker-v27.5.1" -> "27.5.1" | "v27.5.1" -> "27.5.1"
+          CLEAN_VERSION=$(echo $RAW_TAG | sed -E 's/^(docker-|v)//')
+          
+          echo "Detected Latest Docker Version: $CLEAN_VERSION (from tag: $RAW_TAG)"
+
+          # --- 2. UPDATE DOCKERD (Engine) ---
+          # Fetch Hash for Moby
+          MOBY_HASH=$(curl -s "https://api.github.com/repos/moby/moby/git/ref/tags/$RAW_TAG" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+          
+          update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile"
+
+
+          # --- 3. UPDATE DOCKER CLI (Client) ---
+          # Use the SAME Clean Version, but fetch hash from docker/cli repo
+          # Note: docker/cli tags are usually just "v27.5.1" even if moby is "docker-v27.5.1"
+          CLI_TAG="v$CLEAN_VERSION"
+          
+          CLI_HASH=$(curl -s "https://api.github.com/repos/docker/cli/git/ref/tags/$CLI_TAG" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+          
+          if [ -z "$CLI_HASH" ]; then
+             echo "::warning::Could not find CLI hash for tag $CLI_TAG. Trying without 'v' prefix..."
+             CLI_HASH=$(curl -s "https://api.github.com/repos/docker/cli/git/ref/tags/$CLEAN_VERSION" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
+          
+          update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
+
+
+          # --- 4. UPDATE CONTAINERD ---
+          # Containerd is independent, so we fetch its own latest tag
+          CT_TAG=$(curl -s "https://api.github.com/repos/containerd/containerd/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          CT_VERSION=${CT_TAG#v}
+          CT_HASH=$(curl -s "https://api.github.com/repos/containerd/containerd/git/ref/tags/$CT_TAG" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/')
+          
+          update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
       - name: Install Updated Packages
         working-directory: ./sdk
@@ -112,9 +160,13 @@ jobs:
         run: |
           make defconfig
           
-          # Build in dependency order
+          echo "Compiling containerd..."
           make package/containerd/compile V=s
+          
+          echo "Compiling dockerd..."
           make package/dockerd/compile V=s
+          
+          echo "Compiling docker..."
           make package/docker/compile V=s
 
       - name: Collect Artifacts
@@ -129,9 +181,15 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: success()
         with:
-          tag_name: "weekly-${{ github.run_number }}"
-          name: "Weekly Docker Build (Pi 5)"
+          tag_name: "docker-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}"
+          name: "Docker ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})"
           files: output/*.ipk
           body: |
-             Target: Raspberry Pi 5 (bcm27xx/bcm2712)
-             SDK: ${{ steps.sdk.outputs.filename }}
+             **OpenWrt Version:** ${{ env.OPENWRT_VERSION }}
+             **Target:** ${{ env.TARGET }}
+             **SDK:** ${{ steps.sdk_config.outputs.filename }}
+             
+             **Components Updated:**
+             * Docker / Dockerd
+             * Containerd
+             * Runc
