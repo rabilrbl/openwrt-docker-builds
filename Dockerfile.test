@@ -33,9 +33,9 @@ RUN useradd -m -s /bin/bash builder
 USER builder
 WORKDIR /home/builder
 
-# Copy the local build script
-COPY --chown=builder:builder scripts/local-build.sh /home/builder/local-build.sh
-RUN chmod +x /home/builder/local-build.sh
+# Copy all scripts
+COPY --chown=builder:builder scripts /home/builder/scripts
+RUN chmod +x /home/builder/scripts/*.sh
 
 # Default command
-ENTRYPOINT ["/home/builder/local-build.sh"]
+ENTRYPOINT ["/home/builder/scripts/local-build.sh"]

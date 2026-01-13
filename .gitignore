@@ -1,0 +1,8 @@
+# Local test artifacts
+cache/
+output/
+sdk/
+sdk.archive
+
+# Temporary build files
+tmp_packages/
