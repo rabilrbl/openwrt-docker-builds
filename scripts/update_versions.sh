@@ -99,3 +99,10 @@ echo "  Containerd:  $CT_VERSION ($CT_HASH)"
 update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "$MAKEFILE_DIR/dockerd/Makefile" "$RAW_MOBY_TAG"
 update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "$MAKEFILE_DIR/docker/Makefile"
 update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "$MAKEFILE_DIR/containerd/Makefile"
+
+# Patch containerd Makefile to remove legacy shims (removed in 2.0)
+# This removes "containerd-shim,containerd-shim-runc-v1," from the install list
+if [ -f "$MAKEFILE_DIR/containerd/Makefile" ]; then
+    echo "Patching containerd Makefile to remove legacy shims..."
+    sed -i 's/containerd-shim,containerd-shim-runc-v1,//' "$MAKEFILE_DIR/containerd/Makefile"
+fi
