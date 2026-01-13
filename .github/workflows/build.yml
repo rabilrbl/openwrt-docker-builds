@@ -146,15 +146,31 @@ jobs:
             NEW_VERSION=$2
             NEW_HASH=$3
             MAKEFILE=$4
+            NEW_REF=$5
             
             echo "----------------------------------------"
             echo "Updating $PKG_NAME to $NEW_VERSION"
             echo "Hash: $NEW_HASH"
+            if [ -n "$NEW_REF" ]; then
+               echo "Ref: $NEW_REF"
+            fi
             
             # Update Version and Source Hash
             sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
             sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
             sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
+            
+            # Update Git Ref if provided (for special tags like docker-v*)
+            if [ -n "$NEW_REF" ]; then
+                if grep -q "^PKG_GIT_REF:=" $MAKEFILE; then
+                     sed -i "s|^PKG_GIT_REF:=.*|PKG_GIT_REF:=$NEW_REF|" $MAKEFILE
+                else
+                     # If the variable doesn't exist, we might want to verify why, 
+                     # but for now, we assume it exists as per our research or we append it?
+                     # Safest is sed replacement if it exists. Re-check context: dockerd Makefile has PKG_GIT_REF.
+                     :
+                fi
+            fi
           }
 
           # --- 1. GET DATA ---
@@ -178,7 +194,10 @@ jobs:
           # echo "  Containerd:  $CT_VERSION"
 
           # --- 2. UPDATE MAKEFILES ---
-          update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile"
+          # Pass RAW_MOBY_TAG (e.g. docker-v29.1.4) as the custom ref for dockerd
+          update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile" "$RAW_MOBY_TAG"
+          
+          # Docker CLI uses standard vPrefix, so default ref handling in Makefile (v$PKG_VERSION) works
           update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
           # update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
