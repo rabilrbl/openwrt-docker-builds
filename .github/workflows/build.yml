@@ -32,9 +32,9 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          # Added 'jq' for reliable JSON parsing
+          # Added 'jq' for reliable JSON parsing and 'coreutils' for hash utilities (md5sum, sha256sum)
           sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
-            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq
+            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq coreutils
 
       - name: Resolve SDK URL
         id: sdk_config
