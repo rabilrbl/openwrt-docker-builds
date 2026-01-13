@@ -83,9 +83,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: sdk/feeds
-          key: ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
+          key: ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}
           restore-keys: |
-            ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
             ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-
 
       - name: Update and install feeds with retry
