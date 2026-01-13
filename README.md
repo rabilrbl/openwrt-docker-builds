@@ -13,10 +13,12 @@ The official OpenWrt Docker packages are often outdated and lag behind the lates
 
 ## 🚀 How to Use This Repository
 
-### Option 1: Download Pre-built Packages (Recommended)
+### Option 1: Download Pre-built Packages
+
+**Note:** This repository only builds packages for **Raspberry Pi 5** (`bcm27xx/bcm2712`) by default. If you need packages for a different architecture, skip to **Option 2** below.
 
 1. Visit the [Releases page](https://github.com/rabilrbl/openwrt-docker-builds/releases)
-2. Download the `.ipk` files for your OpenWrt version and architecture
+2. Download the `.ipk` files for Raspberry Pi 5
 3. Transfer them to your OpenWrt router
 4. Install using `opkg install <package>.ipk`
 
