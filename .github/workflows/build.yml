@@ -68,10 +68,36 @@ jobs:
           # Disable signature check to avoid "signature check failed" errors on snapshots
           sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
 
+      - name: Configure Git
+        run: |
+          git config --global http.postBuffer 524288000
+          git config --global http.lowSpeedLimit 0
+          git config --global http.lowSpeedTime 999999
+
       - name: Update Feeds
         working-directory: ./sdk
         run: |
-          ./scripts/feeds update -a
+          # Retry logic for feeds update
+          MAX_ATTEMPTS=5
+          DELAY=10
+          ATTEMPT=1
+          
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS: Updating feeds..."
+            if ./scripts/feeds update -a; then
+              echo "Feeds update successful!"
+              break
+            else
+              if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+                echo "::error::Failed to update feeds after $MAX_ATTEMPTS attempts"
+                exit 1
+              fi
+              echo "::warning::Feeds update failed, retrying in $DELAY seconds..."
+              sleep $DELAY
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+          
           ./scripts/feeds install -a -p packages
 
       - name: Automate Version Updates
