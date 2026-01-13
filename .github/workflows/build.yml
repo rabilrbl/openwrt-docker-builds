@@ -36,6 +36,12 @@ jobs:
           sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
             zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq coreutils
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
       - name: Resolve SDK URL
         id: sdk_config
         run: ./scripts/setup_sdk.sh resolve
