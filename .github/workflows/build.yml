@@ -169,18 +169,18 @@ jobs:
           CLI_HASH=$(get_commit_hash "docker/cli" "$CLI_TAG")
           
           # Containerd
-          RAW_CT_TAG=$(get_latest_tag "containerd/containerd")
-          CT_VERSION=$(clean_version "$RAW_CT_TAG")
-          CT_HASH=$(get_commit_hash "containerd/containerd" "$RAW_CT_TAG")
+          # RAW_CT_TAG=$(get_latest_tag "containerd/containerd")
+          # CT_VERSION=$(clean_version "$RAW_CT_TAG")
+          # CT_HASH=$(get_commit_hash "containerd/containerd" "$RAW_CT_TAG")
 
           echo "Detected Versions:"
           echo "  Docker/Moby: $CLEAN_VERSION"
-          echo "  Containerd:  $CT_VERSION"
+          # echo "  Containerd:  $CT_VERSION"
 
           # --- 2. UPDATE MAKEFILES ---
           update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile"
           update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
-          update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
+          # update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
       - name: Register Packages
         working-directory: ./sdk
