@@ -38,22 +38,7 @@ jobs:
 
       - name: Resolve SDK URL
         id: sdk_config
-        run: |
-          if [ "${{ env.OPENWRT_VERSION }}" == "snapshot" ]; then
-            BASE_URL="https://downloads.openwrt.org/snapshots/targets/${{ env.TARGET }}/"
-          else
-            BASE_URL="https://downloads.openwrt.org/releases/${{ env.OPENWRT_VERSION }}/targets/${{ env.TARGET }}/"
-          fi
-          
-          SDK_FILE=$(curl -sL --retry 3 "$BASE_URL" | grep -o 'href="openwrt-sdk-[^"]*Linux-x86_64.tar\.[a-z]*"' | cut -d'"' -f2 | head -n 1 || true)
-          
-          if [ -z "$SDK_FILE" ]; then
-            echo "::error::Could not find SDK file at $BASE_URL"
-            exit 1
-          fi
-
-          echo "url=${BASE_URL}${SDK_FILE}" >> $GITHUB_OUTPUT
-          echo "filename=$SDK_FILE" >> $GITHUB_OUTPUT
+        run: ./scripts/setup_sdk.sh resolve
 
       - name: Cache SDK
         id: cache-sdk
@@ -66,12 +51,7 @@ jobs:
 
       - name: Download and Setup SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: |
-          wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
-          mkdir sdk
-          tar -I zstd -xf sdk.archive -C sdk --strip-components=1
-          cd sdk
-          sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
+        run: ./scripts/setup_sdk.sh setup
 
       - name: Configure Git for large repositories
         run: |
@@ -89,154 +69,21 @@ jobs:
 
       - name: Update and install feeds with retry
         working-directory: ./sdk
-        run: |
-          max_attempts=3
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt of $max_attempts..."
-            if ./scripts/feeds update -a; then
-              echo "Feed update successful"
-              exit 0
-            else
-              echo "Feed update failed"
-            fi
-            
-            if [ $attempt -eq $max_attempts ]; then
-              echo "Failed after $max_attempts attempts"
-              exit 1
-            fi
-            
-            echo "Retrying in 10 seconds..."
-            attempt=$((attempt+1))
-            sleep 10
-          done
+        run: ../scripts/update_feeds.sh
 
       - name: Upgrade Golang
         working-directory: ./sdk
-        run: |
-          # Upgrade golang package from upstream master to support containerd 2.2.0 (requires Go 1.24+)
-          rm -rf feeds/packages/lang/golang
-          svn export https://github.com/openwrt/packages/trunk/lang/golang feeds/packages/lang/golang || \
-            (git clone --depth 1 --filter=blob:none --sparse https://github.com/openwrt/packages.git tmp_packages && \
-             cd tmp_packages && git sparse-checkout set lang/golang && cd .. && \
-             mv tmp_packages/lang/golang feeds/packages/lang/ && rm -rf tmp_packages)
-          
-          # Install the updated golang package
-          ./scripts/feeds install -f golang
+        run: ../scripts/update_golang.sh
 
       - name: Automate Version Updates
         working-directory: ./sdk
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # --- HELPER FUNCTIONS ---
-          get_latest_tag() {
-             # Uses jq for safe parsing
-             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
-          }
-          
-          get_tarball_hash() {
-             local url="$1"
-             curl -sL "$url" | sha256sum | awk '{print $1}'
-          }
+        run: ../scripts/update_versions.sh
 
-          # Robust version cleaner: strips 'docker-', 'v', etc. recursively
-          clean_version() {
-             local v=$1
-             # Remove 'docker-' prefix if present
-             v=${v#docker-}
-             # Remove 'v' prefix if present
-             v=${v#v}
-             echo "$v"
-          }
-
-          update_makefile() {
-            PKG_NAME=$1
-            NEW_VERSION=$2
-            NEW_HASH=$3
-            MAKEFILE=$4
-            NEW_REF=$5
-            
-            echo "----------------------------------------"
-            echo "Updating $PKG_NAME to $NEW_VERSION"
-            echo "Hash: $NEW_HASH"
-            if [ -n "$NEW_REF" ]; then
-               echo "Ref: $NEW_REF"
-            fi
-            
-            # Update Version
-            sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
-            
-            # Update Hash (PKG_HASH) - this works for dockerd
-            if grep -q "^PKG_HASH:=" $MAKEFILE; then
-                sed -i "s/^PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/" $MAKEFILE
-            fi
-            
-            # Update Hash (PKG_SOURCE_VERSION) - fallback/alternative
-            if grep -q "^PKG_SOURCE_VERSION:=" $MAKEFILE; then
-                 # If using tarball hash in PKG_SOURCE_VERSION (rare but possible) or incorrect usage, we update it.
-                 # But if it's a commit hash, we might be breaking it if we put a tarball hash.
-                 # However, dockerd uses PKG_HASH for tarballs usually.
-                 # Let's check context. If PKG_HASH exists, likely PKG_SOURCE_VERSION is unused for hash or is commit.
-                 # If PKG_HASH does NOT exist, PKG_SOURCE_VERSION might be the hash.
-                 if ! grep -q "^PKG_HASH:=" $MAKEFILE; then
-                     sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
-                 fi
-            fi
-            
-            sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
-            
-            # Update Git Ref if provided (for special tags like docker-v*)
-            if [ -n "$NEW_REF" ]; then
-                if grep -q "^PKG_GIT_REF:=" $MAKEFILE; then
-                     sed -i "s|^PKG_GIT_REF:=.*|PKG_GIT_REF:=$NEW_REF|" $MAKEFILE
-                fi
-            fi
-          }
-
-          # --- 1. GET DATA ---
-          # Dockerd (Moby)
-          RAW_MOBY_TAG=$(get_latest_tag "moby/moby")
-          CLEAN_VERSION=$(clean_version "$RAW_MOBY_TAG")
-          # Construct the URL exactly as the Makefile does or equivalent
-          # Makefile: https://codeload.github.com/moby/moby/tar.gz/$(PKG_GIT_REF)
-          MOBY_URL="https://codeload.github.com/moby/moby/tar.gz/$RAW_MOBY_TAG"
-          echo "Calculating hash for $MOBY_URL..."
-          MOBY_HASH=$(get_tarball_hash "$MOBY_URL")
-          
-          # Docker CLI (Match version with Moby)
-          # We try v27.x.x first
-          CLI_TAG="v$CLEAN_VERSION"
-          CLI_URL="https://codeload.github.com/docker/cli/tar.gz/$CLI_TAG"
-          echo "Calculating hash for $CLI_URL..."
-          CLI_HASH=$(get_tarball_hash "$CLI_URL")
-          
-          # Containerd
-          # Dockerd requires exactly 2.2.0 for this version
-          CT_VERSION="2.2.0"
-          CT_TAG="v$CT_VERSION"
-          CT_URL="https://codeload.github.com/containerd/containerd/tar.gz/$CT_TAG"
-          echo "Calculating hash for $CT_URL..."
-          CT_HASH=$(get_tarball_hash "$CT_URL")
-
-          echo "Detected Versions:"
-          echo "  Docker/Moby: $CLEAN_VERSION ($MOBY_HASH)"
-          echo "  Docker CLI:  $CLEAN_VERSION ($CLI_HASH)"
-          echo "  Containerd:  $CT_VERSION ($CT_HASH)"
-
-          # --- 2. UPDATE MAKEFILES ---
-          # Pass RAW_MOBY_TAG (e.g. docker-v29.1.4) as the custom ref for dockerd
-          update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile" "$RAW_MOBY_TAG"
-          
-          # Docker CLI
-          update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
-          
-          # Containerd
-          update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
       - name: Register Packages
         working-directory: ./sdk
-        run: |
-          ./scripts/feeds install docker dockerd containerd runc
+        run: ./scripts/feeds install docker dockerd containerd runc
 
       - name: Cache Build Artifacts
         uses: actions/cache@v4
@@ -252,21 +99,7 @@ jobs:
 
       - name: Compile Packages
         working-directory: ./sdk
-        run: |
-          make defconfig
-          
-          echo "::group::Compile Containerd"
-          make package/containerd/compile V=s
-          echo "::endgroup::"
-          
-          echo "::group::Compile Dockerd"
-          make package/dockerd/compile V=s
-          echo "::endgroup::"
-          
-          echo "::group::Compile Docker CLI"
-          make package/docker/compile V=s
-          echo "::endgroup::"
-
+        run: ../scripts/compile.sh
       - name: Collect Artifacts
         run: |
           mkdir -p output

@@ -1,0 +1,41 @@
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+# Matches the list in .github/workflows/build.yml
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libncurses5-dev \
+    libncursesw5-dev \
+    zlib1g-dev \
+    gawk \
+    git \
+    gettext \
+    libssl-dev \
+    xsltproc \
+    rsync \
+    wget \
+    unzip \
+    python3 \
+    qemu-utils \
+    zstd \
+    jq \
+    coreutils \
+    file \
+    subversion \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user (builder)
+RUN useradd -m -s /bin/bash builder
+USER builder
+WORKDIR /home/builder
+
+# Copy the local build script
+COPY --chown=builder:builder scripts/local-build.sh /home/builder/local-build.sh
+RUN chmod +x /home/builder/local-build.sh
+
+# Default command
+ENTRYPOINT ["/home/builder/local-build.sh"]
