@@ -67,19 +67,33 @@ jobs:
         run: |
           git config --global http.postBuffer 524288000
           git config --global http.lowSpeedLimit 0
-          git config --global http.lowSpeedTime 999999
+          git config --global http.lowSpeedTime 999999  # Effectively disable timeout
 
       - name: Update and install feeds with retry
         working-directory: ./sdk
         run: |
           max_attempts=3
           attempt=1
-          until ./scripts/feeds update -a && ./scripts/feeds install -a -p packages; do
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts..."
+            if ./scripts/feeds update -a; then
+              echo "Feed update successful"
+              if ./scripts/feeds install -a -p packages; then
+                echo "Feed install successful"
+                exit 0
+              else
+                echo "Feed install failed"
+              fi
+            else
+              echo "Feed update failed"
+            fi
+            
             if [ $attempt -eq $max_attempts ]; then
               echo "Failed after $max_attempts attempts"
               exit 1
             fi
-            echo "Feed operation failed, retrying (attempt $((attempt+1))/$max_attempts)..."
+            
+            echo "Retrying in 10 seconds..."
             attempt=$((attempt+1))
             sleep 10
           done
