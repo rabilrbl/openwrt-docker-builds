@@ -70,8 +70,11 @@ jobs:
 
       - name: Configure Git
         run: |
+          # Increase buffer size to 500MB for large repository transfers
           git config --global http.postBuffer 524288000
+          # Disable low speed limit to prevent premature connection timeouts
           git config --global http.lowSpeedLimit 0
+          # Set extremely long timeout (approximately 11.5 days) for slow connections
           git config --global http.lowSpeedTime 999999
 
       - name: Update Feeds
