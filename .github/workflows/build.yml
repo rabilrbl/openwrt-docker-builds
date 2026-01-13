@@ -199,21 +199,27 @@ jobs:
           CLI_HASH=$(get_tarball_hash "$CLI_URL")
           
           # Containerd
-          # RAW_CT_TAG=$(get_latest_tag "containerd/containerd")
-          # CT_VERSION=$(clean_version "$RAW_CT_TAG")
-          # CT_HASH=$(get_commit_hash "containerd/containerd" "$RAW_CT_TAG")
+          # Dockerd requires exactly 2.2.0 for this version
+          CT_VERSION="2.2.0"
+          CT_TAG="v$CT_VERSION"
+          CT_URL="https://codeload.github.com/containerd/containerd/tar.gz/$CT_TAG"
+          echo "Calculating hash for $CT_URL..."
+          CT_HASH=$(get_tarball_hash "$CT_URL")
 
           echo "Detected Versions:"
-          echo "  Docker/Moby: $CLEAN_VERSION"
-          # echo "  Containerd:  $CT_VERSION"
+          echo "  Docker/Moby: $CLEAN_VERSION ($MOBY_HASH)"
+          echo "  Docker CLI:  $CLEAN_VERSION ($CLI_HASH)"
+          echo "  Containerd:  $CT_VERSION ($CT_HASH)"
 
           # --- 2. UPDATE MAKEFILES ---
           # Pass RAW_MOBY_TAG (e.g. docker-v29.1.4) as the custom ref for dockerd
           update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile" "$RAW_MOBY_TAG"
           
-          # Docker CLI uses standard vPrefix, so default ref handling in Makefile (v$PKG_VERSION) works
+          # Docker CLI
           update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
-          # update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
+          
+          # Containerd
+          update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
       - name: Register Packages
         working-directory: ./sdk
