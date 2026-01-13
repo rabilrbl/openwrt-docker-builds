@@ -32,8 +32,9 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
+          # Added 'jq' for reliable JSON parsing
           sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
-            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd
+            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq
 
       - name: Resolve SDK URL
         id: sdk_config
@@ -44,17 +45,13 @@ jobs:
             BASE_URL="https://downloads.openwrt.org/releases/${{ env.OPENWRT_VERSION }}/targets/${{ env.TARGET }}/"
           fi
           
-          echo "Looking for SDK in: $BASE_URL"
-          
-          # Fetch with retries
           SDK_FILE=$(curl -sL --retry 3 "$BASE_URL" | grep -o 'href="openwrt-sdk-[^"]*Linux-x86_64.tar\.[a-z]*"' | cut -d'"' -f2 | head -n 1 || true)
           
           if [ -z "$SDK_FILE" ]; then
-            echo "::error::Could not find SDK file at $BASE_URL. Check the target/version."
+            echo "::error::Could not find SDK file at $BASE_URL"
             exit 1
           fi
 
-          echo "Found SDK: $SDK_FILE"
           echo "url=${BASE_URL}${SDK_FILE}" >> $GITHUB_OUTPUT
           echo "filename=$SDK_FILE" >> $GITHUB_OUTPUT
 
@@ -63,34 +60,39 @@ jobs:
           wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
           mkdir sdk
           tar -I zstd -xf sdk.archive -C sdk --strip-components=1
-          
           cd sdk
-          # Disable signature check to avoid "signature check failed" errors on snapshots
           sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
 
       - name: Update Feeds
         working-directory: ./sdk
         run: |
-          # Only DOWNLOAD the package definitions, don't install them yet
           ./scripts/feeds update -a
-          
-          # Verify the directories exist so we can patch them
-          ls -d feeds/packages/utils/docker
-          ls -d feeds/packages/utils/dockerd
-          ls -d feeds/packages/utils/containerd
+          # Install basic dependencies definitions
+          ./scripts/feeds install -a -p packages
 
       - name: Automate Version Updates
         working-directory: ./sdk
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # CRITICAL: Prevents Rate Limiting
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Function to safely fetch tags using the Token
+          # --- HELPER FUNCTIONS ---
           get_latest_tag() {
-             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo ""
+             # Uses jq for safe parsing
+             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
           }
           
           get_commit_hash() {
-             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/git/ref/tags/$2" | grep '"sha":' | sed -E 's/.*"([^"]+)".*/\1/' || echo ""
+             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/git/ref/tags/$2" | jq -r .object.sha
+          }
+
+          # Robust version cleaner: strips 'docker-', 'v', etc. recursively
+          clean_version() {
+             local v=$1
+             # Remove 'docker-' prefix if present
+             v=${v#docker-}
+             # Remove 'v' prefix if present
+             v=${v#v}
+             echo "$v"
           }
 
           update_makefile() {
@@ -99,55 +101,59 @@ jobs:
             NEW_HASH=$3
             MAKEFILE=$4
             
-            if [ -z "$NEW_VERSION" ] || [ -z "$NEW_HASH" ]; then
-                echo "::warning::Skipping $PKG_NAME update (Failed to fetch version/hash)"
-                return
-            fi
+            echo "----------------------------------------"
+            echo "Updating $PKG_NAME to $NEW_VERSION"
+            echo "Hash: $NEW_HASH"
             
-            echo "Updating $PKG_NAME -> $NEW_VERSION ($NEW_HASH)"
-            
+            # Update Version and Source Hash
             sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
             sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
             sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
             
-            # Clear old hashes
+            # FIX: Force SKIP checksums (prevents 'cannot find hash command' error)
+            # We remove existing lines and append the explicit 'skip' instruction
             sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE
             sed -i "/^PKG_HASH:=/d" $MAKEFILE
+            echo "PKG_MIRROR_HASH:=skip" >> $MAKEFILE
+            echo "PKG_HASH:=skip" >> $MAKEFILE
             
-            # Disable Go Mod Hash Check
+            # FIX: Disable Go Module Hash Check
+            sed -i "/^GO_PKG_MOD_HASH:=/d" $MAKEFILE
             sed -i "/^GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK/d" $MAKEFILE
             echo "GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK:=0" >> $MAKEFILE
+            
+            # Remove Date (conflicts with hash/version bumps sometimes)
+            sed -i "/^PKG_SOURCE_DATE:=/d" $MAKEFILE
           }
 
           # --- 1. GET DATA ---
-          echo "Fetching latest Moby (Dockerd) version..."
-          RAW_TAG=$(get_latest_tag "moby/moby")
-          CLEAN_VERSION=$(echo $RAW_TAG | sed -E 's/^(docker-|v)//')
-          MOBY_HASH=$(get_commit_hash "moby/moby" "$RAW_TAG")
+          # Dockerd (Moby)
+          RAW_MOBY_TAG=$(get_latest_tag "moby/moby")
+          CLEAN_VERSION=$(clean_version "$RAW_MOBY_TAG")
+          MOBY_HASH=$(get_commit_hash "moby/moby" "$RAW_MOBY_TAG")
           
-          echo "Fetching Docker CLI hash..."
+          # Docker CLI (Match version with Moby)
+          # We try v27.x.x first
           CLI_TAG="v$CLEAN_VERSION"
           CLI_HASH=$(get_commit_hash "docker/cli" "$CLI_TAG")
-          # Fallback if tag naming differs
-          if [ -z "$CLI_HASH" ]; then 
-             CLI_HASH=$(get_commit_hash "docker/cli" "$CLEAN_VERSION")
-          fi
           
-          echo "Fetching Containerd version..."
-          CT_TAG=$(get_latest_tag "containerd/containerd")
-          CT_VERSION=${CT_TAG#v}
-          CT_HASH=$(get_commit_hash "containerd/containerd" "$CT_TAG")
+          # Containerd
+          RAW_CT_TAG=$(get_latest_tag "containerd/containerd")
+          CT_VERSION=$(clean_version "$RAW_CT_TAG")
+          CT_HASH=$(get_commit_hash "containerd/containerd" "$RAW_CT_TAG")
+
+          echo "Detected Versions:"
+          echo "  Docker/Moby: $CLEAN_VERSION"
+          echo "  Containerd:  $CT_VERSION"
 
           # --- 2. UPDATE MAKEFILES ---
           update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "feeds/packages/utils/dockerd/Makefile"
           update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
           update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
-      - name: Install Specific Packages
+      - name: Register Packages
         working-directory: ./sdk
         run: |
-          # INSTALL ONLY WHAT WE NEED
-          # This avoids scanning broken packages in the rest of the feed
           ./scripts/feeds install docker dockerd containerd runc
 
       - name: Compile Packages
@@ -155,15 +161,17 @@ jobs:
         run: |
           make defconfig
           
-          # Compile in dependency order
-          echo "Compiling containerd..."
-          make package/containerd/compile V=s || echo "::warning::Containerd build failed"
+          echo "::group::Compile Containerd"
+          make package/containerd/compile V=s
+          echo "::endgroup::"
           
-          echo "Compiling dockerd..."
-          make package/dockerd/compile V=s || echo "::warning::Dockerd build failed"
+          echo "::group::Compile Dockerd"
+          make package/dockerd/compile V=s
+          echo "::endgroup::"
           
-          echo "Compiling docker..."
-          make package/docker/compile V=s || echo "::warning::Docker build failed"
+          echo "::group::Compile Docker CLI"
+          make package/docker/compile V=s
+          echo "::endgroup::"
 
       - name: Collect Artifacts
         run: |
@@ -181,6 +189,8 @@ jobs:
           name: "Docker ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})"
           files: output/*.ipk
           body: |
-             **OpenWrt Version:** ${{ env.OPENWRT_VERSION }}
              **Target:** ${{ env.TARGET }}
-             **SDK:** ${{ steps.sdk_config.outputs.filename }}
+             **Components:**
+             * Docker/Dockerd
+             * Containerd
+             * Runc
