@@ -8,5 +8,8 @@ if [ ! -f "scripts/feeds" ]; then
 fi
 
 echo "Updating feeds..."
+# Clean up potential stale base feed from cache
+rm -rf feeds/base feeds/*.index
+
 ./scripts/feeds update -a
 ./scripts/feeds install -a
