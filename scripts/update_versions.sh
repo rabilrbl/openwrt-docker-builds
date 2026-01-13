@@ -155,6 +155,12 @@ if [ "$COMPOSE_TAG" != "null" ] && [ -n "$COMPOSE_TAG" ]; then
     
     echo "  Docker Compose: $COMPOSE_VERSION ($COMPOSE_HASH) Commit: $COMPOSE_COMMIT"
     update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT"
+
+    # Fix Go package path for v5+
+    if [[ "$COMPOSE_VERSION" == 5.* ]]; then
+        echo "  Updating Go package path to v5..."
+        sed -i "s|github.com/docker/compose/v2|github.com/docker/compose/v5|g" "$MAKEFILE_DIR/docker-compose/Makefile"
+    fi
 fi
 
 # Patch containerd Makefile to remove legacy shims (removed in 2.0)
