@@ -23,3 +23,6 @@ make package/docker/compile V=s
 # Compilation of runc is often implied or needed; ensuring it builds
 echo "Compiling Runc..."
 make package/runc/compile V=s
+
+echo "Compiling Docker Compose..."
+make package/docker-compose/compile V=s
