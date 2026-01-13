@@ -71,8 +71,13 @@ jobs:
       - name: Update Feeds
         working-directory: ./sdk
         run: |
+          # Only DOWNLOAD the package definitions, don't install them yet
           ./scripts/feeds update -a
-          ./scripts/feeds install -a -p packages
+          
+          # Verify the directories exist so we can patch them
+          ls -d feeds/packages/utils/docker
+          ls -d feeds/packages/utils/dockerd
+          ls -d feeds/packages/utils/containerd
 
       - name: Automate Version Updates
         working-directory: ./sdk
@@ -138,17 +143,19 @@ jobs:
           update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "feeds/packages/utils/docker/Makefile"
           update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "feeds/packages/utils/containerd/Makefile"
 
-      - name: Install Updated Packages
+      - name: Install Specific Packages
         working-directory: ./sdk
         run: |
-          ./scripts/feeds install docker dockerd containerd
+          # INSTALL ONLY WHAT WE NEED
+          # This avoids scanning broken packages in the rest of the feed
+          ./scripts/feeds install docker dockerd containerd runc
 
       - name: Compile Packages
         working-directory: ./sdk
         run: |
           make defconfig
           
-          # IGNORE_ERRORS=1 is safer for automated builds
+          # Compile in dependency order
           echo "Compiling containerd..."
           make package/containerd/compile V=s || echo "::warning::Containerd build failed"
           
