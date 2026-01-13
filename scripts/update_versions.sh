@@ -156,21 +156,28 @@ if [ "$COMPOSE_TAG" != "null" ] && [ -n "$COMPOSE_TAG" ]; then
     update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT"
     
     # Patch docker-compose Makefile to update Go module path based on version
-    # Docker Compose v5+ uses github.com/docker/compose/v5, v2-v4 use v2
+    # Docker Compose uses versioned module paths (e.g., v5 uses github.com/docker/compose/v5)
     if [ -f "$MAKEFILE_DIR/docker-compose/Makefile" ]; then
         echo "Patching docker-compose Makefile to update Go module path..."
-        # Extract major version from COMPOSE_VERSION (e.g., 5.0.1 -> 5)
-        MAJOR_VERSION=$(echo "$COMPOSE_VERSION" | cut -d. -f1)
-        echo "  Major version: v$MAJOR_VERSION"
+        # Extract major version from COMPOSE_VERSION (e.g., 5.0.1 -> 5, 5.0.1-rc1 -> 5)
+        # Remove everything after '-' (pre-release suffixes) and extract first number
+        MAJOR_VERSION=$(echo "$COMPOSE_VERSION" | cut -d- -f1 | cut -d. -f1)
         
-        # Update GO_PKG line
-        sed -i "s|^GO_PKG:=github.com/docker/compose/v[0-9]*|GO_PKG:=github.com/docker/compose/v$MAJOR_VERSION|" "$MAKEFILE_DIR/docker-compose/Makefile"
-        
-        # Update GO_PKG_BUILD_PKG line  
-        sed -i "s|^GO_PKG_BUILD_PKG:=github.com/docker/compose/v[0-9]*/cmd|GO_PKG_BUILD_PKG:=github.com/docker/compose/v$MAJOR_VERSION/cmd|" "$MAKEFILE_DIR/docker-compose/Makefile"
-        
-        # Update GO_PKG_LDFLAGS_X line
-        sed -i "s|^GO_PKG_LDFLAGS_X:=github.com/docker/compose/v[0-9]*/internal.Version|GO_PKG_LDFLAGS_X:=github.com/docker/compose/v$MAJOR_VERSION/internal.Version|" "$MAKEFILE_DIR/docker-compose/Makefile"
+        # Validate that we extracted a numeric version
+        if ! [[ "$MAJOR_VERSION" =~ ^[0-9]+$ ]]; then
+            echo "  Warning: Could not extract valid major version from '$COMPOSE_VERSION', skipping module path update"
+        else
+            echo "  Major version: v$MAJOR_VERSION"
+            
+            # Update GO_PKG line
+            sed -i "s|^GO_PKG:=github.com/docker/compose/v[0-9]*|GO_PKG:=github.com/docker/compose/v$MAJOR_VERSION|" "$MAKEFILE_DIR/docker-compose/Makefile"
+            
+            # Update GO_PKG_BUILD_PKG line  
+            sed -i "s|^GO_PKG_BUILD_PKG:=github.com/docker/compose/v[0-9]*/cmd|GO_PKG_BUILD_PKG:=github.com/docker/compose/v$MAJOR_VERSION/cmd|" "$MAKEFILE_DIR/docker-compose/Makefile"
+            
+            # Update GO_PKG_LDFLAGS_X line
+            sed -i "s|^GO_PKG_LDFLAGS_X:=github.com/docker/compose/v[0-9]*/internal.Version|GO_PKG_LDFLAGS_X:=github.com/docker/compose/v$MAJOR_VERSION/internal.Version|" "$MAKEFILE_DIR/docker-compose/Makefile"
+        fi
     fi
 fi
 
