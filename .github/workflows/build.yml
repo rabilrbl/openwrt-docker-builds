@@ -122,8 +122,9 @@ jobs:
              curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
           }
           
-          get_commit_hash() {
-             curl -H "Authorization: token $GH_TOKEN" -s "https://api.github.com/repos/$1/git/ref/tags/$2" | jq -r .object.sha
+          get_tarball_hash() {
+             local url="$1"
+             curl -sL "$url" | sha256sum | awk '{print $1}'
           }
 
           # Robust version cleaner: strips 'docker-', 'v', etc. recursively
@@ -150,20 +151,32 @@ jobs:
                echo "Ref: $NEW_REF"
             fi
             
-            # Update Version and Source Hash
+            # Update Version
             sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
-            sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
+            
+            # Update Hash (PKG_HASH) - this works for dockerd
+            if grep -q "^PKG_HASH:=" $MAKEFILE; then
+                sed -i "s/^PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/" $MAKEFILE
+            fi
+            
+            # Update Hash (PKG_SOURCE_VERSION) - fallback/alternative
+            if grep -q "^PKG_SOURCE_VERSION:=" $MAKEFILE; then
+                 # If using tarball hash in PKG_SOURCE_VERSION (rare but possible) or incorrect usage, we update it.
+                 # But if it's a commit hash, we might be breaking it if we put a tarball hash.
+                 # However, dockerd uses PKG_HASH for tarballs usually.
+                 # Let's check context. If PKG_HASH exists, likely PKG_SOURCE_VERSION is unused for hash or is commit.
+                 # If PKG_HASH does NOT exist, PKG_SOURCE_VERSION might be the hash.
+                 if ! grep -q "^PKG_HASH:=" $MAKEFILE; then
+                     sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
+                 fi
+            fi
+            
             sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
             
             # Update Git Ref if provided (for special tags like docker-v*)
             if [ -n "$NEW_REF" ]; then
                 if grep -q "^PKG_GIT_REF:=" $MAKEFILE; then
                      sed -i "s|^PKG_GIT_REF:=.*|PKG_GIT_REF:=$NEW_REF|" $MAKEFILE
-                else
-                     # If the variable doesn't exist, we might want to verify why, 
-                     # but for now, we assume it exists as per our research or we append it?
-                     # Safest is sed replacement if it exists. Re-check context: dockerd Makefile has PKG_GIT_REF.
-                     :
                 fi
             fi
           }
@@ -172,12 +185,18 @@ jobs:
           # Dockerd (Moby)
           RAW_MOBY_TAG=$(get_latest_tag "moby/moby")
           CLEAN_VERSION=$(clean_version "$RAW_MOBY_TAG")
-          MOBY_HASH=$(get_commit_hash "moby/moby" "$RAW_MOBY_TAG")
+          # Construct the URL exactly as the Makefile does or equivalent
+          # Makefile: https://codeload.github.com/moby/moby/tar.gz/$(PKG_GIT_REF)
+          MOBY_URL="https://codeload.github.com/moby/moby/tar.gz/$RAW_MOBY_TAG"
+          echo "Calculating hash for $MOBY_URL..."
+          MOBY_HASH=$(get_tarball_hash "$MOBY_URL")
           
           # Docker CLI (Match version with Moby)
           # We try v27.x.x first
           CLI_TAG="v$CLEAN_VERSION"
-          CLI_HASH=$(get_commit_hash "docker/cli" "$CLI_TAG")
+          CLI_URL="https://codeload.github.com/docker/cli/tar.gz/$CLI_TAG"
+          echo "Calculating hash for $CLI_URL..."
+          CLI_HASH=$(get_tarball_hash "$CLI_URL")
           
           # Containerd
           # RAW_CT_TAG=$(get_latest_tag "containerd/containerd")
