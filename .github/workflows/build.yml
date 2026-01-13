@@ -55,21 +55,23 @@ jobs:
           echo "url=${BASE_URL}${SDK_FILE}" >> $GITHUB_OUTPUT
           echo "filename=$SDK_FILE" >> $GITHUB_OUTPUT
 
-      - name: Download and Setup SDK
-        run: |
-          wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
-          mkdir sdk
-          tar -I zstd -xf sdk.archive -C sdk --strip-components=1
-          cd sdk
-          sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
-
       - name: Cache SDK
+        id: cache-sdk
         uses: actions/cache@v4
         with:
           path: sdk
           key: ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ steps.sdk_config.outputs.filename }}
           restore-keys: |
             ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
+
+      - name: Download and Setup SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          wget -O sdk.archive ${{ steps.sdk_config.outputs.url }}
+          mkdir sdk
+          tar -I zstd -xf sdk.archive -C sdk --strip-components=1
+          cd sdk
+          sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
 
       - name: Configure Git for large repositories
         run: |
