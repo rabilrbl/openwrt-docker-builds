@@ -142,6 +142,21 @@ echo "Fetching commit SHA for $RUNC_TAG"
 RUNC_COMMIT=$(get_commit_sha "opencontainers/runc" "$RUNC_TAG")
 update_makefile "runc" "$RUNC_VERSION" "$RUNC_HASH" "$MAKEFILE_DIR/runc/Makefile" "$RUNC_TAG" "$RUNC_COMMIT"
 
+# Docker Compose
+# Only v2 is supported as a Go binary
+COMPOSE_TAG=$(get_latest_tag "docker/compose")
+if [ "$COMPOSE_TAG" != "null" ] && [ -n "$COMPOSE_TAG" ]; then
+    COMPOSE_VERSION=$(clean_version "$COMPOSE_TAG")
+    COMPOSE_URL="https://codeload.github.com/docker/compose/tar.gz/$COMPOSE_TAG"
+    echo "Calculating hash for $COMPOSE_URL"
+    COMPOSE_HASH=$(get_tarball_hash "$COMPOSE_URL")
+    echo "Fetching commit SHA for $COMPOSE_TAG"
+    COMPOSE_COMMIT=$(get_commit_sha "docker/compose" "$COMPOSE_TAG")
+    
+    echo "  Docker Compose: $COMPOSE_VERSION ($COMPOSE_HASH) Commit: $COMPOSE_COMMIT"
+    update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT"
+fi
+
 # Patch containerd Makefile to remove legacy shims (removed in 2.0)
 # This removes "containerd-shim,containerd-shim-runc-v1," from the install list
 if [ -f "$MAKEFILE_DIR/containerd/Makefile" ]; then

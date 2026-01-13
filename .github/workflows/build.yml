@@ -89,7 +89,7 @@ jobs:
 
       - name: Register Packages
         working-directory: ./sdk
-        run: ./scripts/feeds install docker dockerd containerd runc
+        run: ./scripts/feeds install docker dockerd containerd runc docker-compose
 
       - name: Cache Build Artifacts
         uses: actions/cache@v4
@@ -113,6 +113,7 @@ jobs:
           find sdk/bin/packages -name "dockerd*.ipk" -exec cp {} output/ \;
           find sdk/bin/packages -name "containerd*.ipk" -exec cp {} output/ \;
           find sdk/bin/packages -name "runc*.ipk" -exec cp {} output/ \;
+          find sdk/bin/packages -name "docker-compose*.ipk" -exec cp {} output/ \;
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
@@ -127,3 +128,4 @@ jobs:
              * Docker/Dockerd
              * Containerd
              * Runc
+             * Docker Compose
