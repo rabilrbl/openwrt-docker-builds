@@ -149,26 +149,50 @@ jobs:
             
             echo "----------------------------------------"
             echo "Updating $PKG_NAME to $NEW_VERSION"
-            echo "Hash: $NEW_HASH"
+            echo "Commit Hash: $NEW_HASH"
+            
+            # Determine the download URL based on package
+            case $PKG_NAME in
+              "dockerd")
+                DOWNLOAD_URL="https://codeload.github.com/moby/moby/tar.gz/$NEW_HASH"
+                ;;
+              "docker")
+                DOWNLOAD_URL="https://codeload.github.com/docker/cli/tar.gz/$NEW_HASH"
+                ;;
+              "containerd")
+                DOWNLOAD_URL="https://codeload.github.com/containerd/containerd/tar.gz/$NEW_HASH"
+                ;;
+            esac
+            
+            # Download and calculate SHA256
+            echo "Downloading to calculate hash..."
+            TEMP_FILE=$(mktemp)
+            if wget -q -O "$TEMP_FILE" "$DOWNLOAD_URL"; then
+              PKG_SHA256=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
+              echo "Calculated SHA256: $PKG_SHA256"
+              rm "$TEMP_FILE"
+            else
+              echo "::error::Failed to download $DOWNLOAD_URL"
+              rm -f "$TEMP_FILE"
+              exit 1
+            fi
             
             # Update Version and Source Hash
             sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$NEW_VERSION/" $MAKEFILE
             sed -i "s/^PKG_SOURCE_VERSION:=.*/PKG_SOURCE_VERSION:=$NEW_HASH/" $MAKEFILE
             sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=1/" $MAKEFILE
             
-            # FIX: Force SKIP checksums (prevents 'cannot find hash command' error)
-            # We remove existing lines and append the explicit 'skip' instruction
+            # Update hash with actual SHA256
             sed -i "/^PKG_MIRROR_HASH:=/d" $MAKEFILE
             sed -i "/^PKG_HASH:=/d" $MAKEFILE
-            echo "PKG_MIRROR_HASH:=skip" >> $MAKEFILE
-            echo "PKG_HASH:=skip" >> $MAKEFILE
+            echo "PKG_HASH:=$PKG_SHA256" >> $MAKEFILE
             
-            # FIX: Disable Go Module Hash Check
+            # Disable Go Module Hash Check
             sed -i "/^GO_PKG_MOD_HASH:=/d" $MAKEFILE
             sed -i "/^GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK/d" $MAKEFILE
             echo "GO_PKG_ENABLE_MOD_DOWNLOAD_CHECK:=0" >> $MAKEFILE
             
-            # Remove Date (conflicts with hash/version bumps sometimes)
+            # Remove Date
             sed -i "/^PKG_SOURCE_DATE:=/d" $MAKEFILE
           }
 
