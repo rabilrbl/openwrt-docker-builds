@@ -114,7 +114,19 @@ CLI_HASH=$(get_tarball_hash "$CLI_URL")
 echo "Fetching commit SHA for $CLI_TAG"
 CLI_COMMIT=$(get_commit_sha "docker/cli" "$CLI_TAG")
 
-CT_TAG="v2.2.0"
+# Fetch Containerd version from Moby
+echo "Fetching Containerd version from Moby ($RAW_MOBY_TAG)..."
+CT_INSTALLER_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/hack/dockerfile/install/containerd.installer"
+CT_VERSION_RAW=$(curl -sL "$CT_INSTALLER_URL" | grep 'CONTAINERD_VERSION:=' | sed -E 's/.*:=([^}]+)\}.*/\1/' || true)
+
+if [ -z "$CT_VERSION_RAW" ]; then
+    echo "Error: Could not determine containerd version from Moby. Fallback to default v1.7.25"
+    CT_TAG="v1.7.25"
+else
+    CT_TAG="$CT_VERSION_RAW"
+    echo "  Found Containerd: $CT_TAG"
+fi
+
 CT_VERSION=$(clean_version "$CT_TAG")
 CT_URL="https://codeload.github.com/containerd/containerd/tar.gz/$CT_TAG"
 echo "Calculating hash for $CT_URL"
@@ -132,9 +144,20 @@ update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "$MAKEFILE_DIR/dockerd/M
 update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "$MAKEFILE_DIR/docker/Makefile" "$CLI_TAG" "$CLI_COMMIT"
 update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "$MAKEFILE_DIR/containerd/Makefile" "$CT_TAG" "$CT_COMMIT"
 
-# Update runc to latest
-RUNC_VERSION="1.3.4"
-RUNC_TAG="v$RUNC_VERSION"
+# Fetch Runc version from Moby
+echo "Fetching Runc version from Moby ($RAW_MOBY_TAG)..."
+RUNC_INSTALLER_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/hack/dockerfile/install/runc.installer"
+RUNC_VERSION_RAW=$(curl -sL "$RUNC_INSTALLER_URL" | grep 'RUNC_VERSION:=' | sed -E 's/.*:=([^}]+)\}.*/\1/' || true)
+
+if [ -z "$RUNC_VERSION_RAW" ]; then
+    echo "Error: Could not determine runc version from Moby. Fallback to default v1.2.4"
+    RUNC_TAG="v1.2.4"
+else
+    RUNC_TAG="$RUNC_VERSION_RAW"
+    echo "  Found Runc: $RUNC_TAG"
+fi
+
+RUNC_VERSION=$(clean_version "$RUNC_TAG")
 RUNC_URL="https://codeload.github.com/opencontainers/runc/tar.gz/$RUNC_TAG"
 echo "Calculating hash for $RUNC_URL"
 RUNC_HASH=$(get_tarball_hash "$RUNC_URL")

@@ -29,11 +29,13 @@ cd sdk
 # 6. Collect Artifacts
 echo "Collecting artifacts..."
 mkdir -p ../output
-find bin/packages -name "docker*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "dockerd*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "containerd*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "runc*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "docker-compose*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "luci-lib-docker*.ipk" -exec cp {} ../output/ \;
+for ext in ipk apk; do
+    find bin/packages -name "docker*.$ext" -exec cp {} ../output/ \;
+    find bin/packages -name "dockerd*.$ext" -exec cp {} ../output/ \;
+    find bin/packages -name "containerd*.$ext" -exec cp {} ../output/ \;
+    find bin/packages -name "runc*.$ext" -exec cp {} ../output/ \;
+    find bin/packages -name "docker-compose*.$ext" -exec cp {} ../output/ \;
+    find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} ../output/ \;
+done
 
 echo "Build complete! Artifacts are in output/"

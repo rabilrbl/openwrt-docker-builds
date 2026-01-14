@@ -71,6 +71,9 @@ if [ -f "feeds.conf.default" ]; then
     if ! grep -q "# option check_signature" feeds.conf.default; then
         sed -i 's/option check_signature/# option check_signature/' feeds.conf.default
     fi
+    # Use GitHub mirrors
+    sed -i 's|git.openwrt.org/feed/|github.com/openwrt/|g' feeds.conf.default
+    sed -i 's|git.openwrt.org/project/|github.com/openwrt/|g' feeds.conf.default
 fi
 
 # Git config for large repos (often needed for feeds)
