@@ -56,7 +56,7 @@ if [ ! -f "sdk/rules.mk" ]; then
         mkdir -p sdk
     fi
     
-    wget -O sdk.archive "$SDK_URL"
+    wget -q --show-progress -O sdk.archive "$SDK_URL"
     echo "Extracting SDK..."
     tar -I zstd -xf sdk.archive -C sdk --strip-components=1
     rm sdk.archive
