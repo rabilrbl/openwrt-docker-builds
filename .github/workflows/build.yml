@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: true
+          cache: false
 
       - name: Resolve SDK URL
         id: sdk_config
@@ -73,7 +73,7 @@ jobs:
       - name: Cache Ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: /home/runner/.ccache
           key: ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
@@ -94,7 +94,7 @@ jobs:
       - name: Compile Packages
         working-directory: ./sdk
         env:
-          CCACHE_DIR: ~/.ccache
+          CCACHE_DIR: /home/runner/.ccache
         run: ../scripts/compile.sh
 
       - name: Collect Artifacts
