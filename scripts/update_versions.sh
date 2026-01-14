@@ -60,7 +60,7 @@ update_makefile() {
         return 1
     fi
     
-    if ! echo "$NEW_HASH" | grep -qE '^[a-f0-9]{64}$'; then
+    if ! echo "$NEW_HASH" | grep -qE '^[a-fA-F0-9]{64}$'; then
         echo "Error: Hash for $PKG_NAME is not a valid SHA256: '$NEW_HASH'"
         return 1
     fi
