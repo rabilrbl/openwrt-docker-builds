@@ -12,9 +12,6 @@ on:
         required: true
         default: 'bcm27xx/bcm2712'
 
-  schedule:
-    - cron: '0 0 * * 5'  # Weekly on Fridays
-
 env:
   OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || 'snapshot' }}
   TARGET: ${{ github.event.inputs.target || 'bcm27xx/bcm2712' }}
