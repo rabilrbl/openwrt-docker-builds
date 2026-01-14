@@ -194,7 +194,7 @@ All versions are automatically fetched from the latest GitHub releases of:
 2. **Fetches the latest versions** of Docker, Dockerd, and Containerd from GitHub
 3. **Updates the Makefile** package definitions with the latest versions
 4. **Compiles the packages** using the OpenWrt build system
-5. **Publishes the `.ipk` files** as a GitHub release
+5. **Publishes the files** as a GitHub release
 
 ## ⚠️ Troubleshooting
 
