@@ -50,8 +50,19 @@ update_makefile() {
     NEW_COMMIT=$6
     
     if [ ! -f "$MAKEFILE" ]; then
-        echo "Warning: Makefile for $PKG_NAME not found at $MAKEFILE"
-        return
+        echo "Error: Makefile for $PKG_NAME not found at $MAKEFILE"
+        return 1
+    fi
+    
+    # Validate hash is a valid SHA256 (64 hex characters)
+    if [ -z "$NEW_HASH" ] || [ "$NEW_HASH" = "x" ] || [ "$NEW_HASH" = "skip" ]; then
+        echo "Error: Invalid hash for $PKG_NAME: '$NEW_HASH'"
+        return 1
+    fi
+    
+    if ! echo "$NEW_HASH" | grep -qE '^[a-f0-9]{64}$'; then
+        echo "Error: Hash for $PKG_NAME is not a valid SHA256: '$NEW_HASH'"
+        return 1
     fi
 
     echo "Updating $PKG_NAME to $NEW_VERSION..."
@@ -94,8 +105,18 @@ echo "Fetching latest versions..."
 
 RAW_MOBY_TAG=$(get_latest_tag "moby/moby")
 if [ "$RAW_MOBY_TAG" == "null" ] || [ -z "$RAW_MOBY_TAG" ]; then
-    echo "Warning: specific version fetch failed. Likely API limit. Using existing versions."
-    exit 0
+    echo "Error: Failed to fetch latest Docker/Moby version from GitHub API."
+    echo "This is likely due to GitHub API rate limits."
+    echo ""
+    echo "The OpenWrt feeds contain placeholder hashes (\"x\") for dockerd that must be updated."
+    echo "Without valid version information, the build will fail."
+    echo ""
+    echo "Solutions:"
+    echo "  1. Wait a few minutes and try again (rate limits reset)"
+    echo "  2. Provide a GitHub token via GH_TOKEN environment variable"
+    echo "  3. Manually update the Makefiles in sdk/feeds/packages/utils/"
+    echo ""
+    exit 1
 fi
 
 CLEAN_VERSION=$(clean_version "$RAW_MOBY_TAG")
@@ -128,9 +149,18 @@ echo "  Docker/Moby: $CLEAN_VERSION ($MOBY_HASH) Commit: $MOBY_COMMIT"
 echo "  Docker CLI:  $CLEAN_VERSION ($CLI_HASH) Commit: $CLI_COMMIT"
 echo "  Containerd:  $CT_VERSION ($CT_HASH) Commit: $CT_COMMIT"
 
-update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "$MAKEFILE_DIR/dockerd/Makefile" "$RAW_MOBY_TAG" "$MOBY_COMMIT"
-update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "$MAKEFILE_DIR/docker/Makefile" "$CLI_TAG" "$CLI_COMMIT"
-update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "$MAKEFILE_DIR/containerd/Makefile" "$CT_TAG" "$CT_COMMIT"
+# Update Makefiles and check for errors
+FAILED=0
+
+update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "$MAKEFILE_DIR/dockerd/Makefile" "$RAW_MOBY_TAG" "$MOBY_COMMIT" || FAILED=1
+update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "$MAKEFILE_DIR/docker/Makefile" "$CLI_TAG" "$CLI_COMMIT" || FAILED=1
+update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "$MAKEFILE_DIR/containerd/Makefile" "$CT_TAG" "$CT_COMMIT" || FAILED=1
+
+if [ $FAILED -eq 1 ]; then
+    echo ""
+    echo "Error: Failed to update one or more Makefiles"
+    exit 1
+fi
 
 # Update runc to latest
 RUNC_VERSION="1.3.4"
@@ -140,7 +170,10 @@ echo "Calculating hash for $RUNC_URL"
 RUNC_HASH=$(get_tarball_hash "$RUNC_URL")
 echo "Fetching commit SHA for $RUNC_TAG"
 RUNC_COMMIT=$(get_commit_sha "opencontainers/runc" "$RUNC_TAG")
-update_makefile "runc" "$RUNC_VERSION" "$RUNC_HASH" "$MAKEFILE_DIR/runc/Makefile" "$RUNC_TAG" "$RUNC_COMMIT"
+update_makefile "runc" "$RUNC_VERSION" "$RUNC_HASH" "$MAKEFILE_DIR/runc/Makefile" "$RUNC_TAG" "$RUNC_COMMIT" || {
+    echo "Error: Failed to update runc Makefile"
+    exit 1
+}
 
 # Docker Compose
 # Only v2 is supported as a Go binary
@@ -154,7 +187,10 @@ if [ "$COMPOSE_TAG" != "null" ] && [ -n "$COMPOSE_TAG" ]; then
     COMPOSE_COMMIT=$(get_commit_sha "docker/compose" "$COMPOSE_TAG")
     
     echo "  Docker Compose: $COMPOSE_VERSION ($COMPOSE_HASH) Commit: $COMPOSE_COMMIT"
-    update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT"
+    update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT" || {
+        echo "Error: Failed to update docker-compose Makefile"
+        exit 1
+    }
 
     # Fix Go package path for v5+
     if [[ "$COMPOSE_VERSION" == 5.* ]]; then
