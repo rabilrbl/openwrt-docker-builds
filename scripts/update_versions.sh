@@ -191,6 +191,10 @@ fi
 if [ -f "$MAKEFILE_DIR/containerd/Makefile" ]; then
     echo "Patching containerd Makefile to remove legacy shims..."
     sed -i 's/containerd-shim,containerd-shim-runc-v1,//' "$MAKEFILE_DIR/containerd/Makefile"
+    
+    # Remove btrfs-progs dependency (heavy C build)
+    echo "Patching containerd Makefile to remove btrfs-progs dependency..."
+    sed -i 's/+btrfs-progs //' "$MAKEFILE_DIR/containerd/Makefile"
 fi
 
 # Patch docker Makefile to find the correct binary (go build output path varies)
@@ -203,10 +207,12 @@ if [ -f "$MAKEFILE_DIR/docker/Makefile" ]; then
     sed -i 's|\$(INSTALL_BIN) \$(PKG_BUILD_DIR)/build/docker \$(1)/usr/bin/|find $(PKG_BUILD_DIR) -name "docker-linux-*" -type f -exec $(INSTALL_BIN) {} $(1)/usr/bin/docker \\;|' "$MAKEFILE_DIR/docker/Makefile"
 fi
 
-# Patch dockerd Makefile to add kmod-ipt-raw dependency (needed for Docker networking)
+# Patch dockerd Makefile to remove heavy kmod/iptables dependencies (assume user has them or doesn't need them during build)
 if [ -f "$MAKEFILE_DIR/dockerd/Makefile" ]; then
-    echo "Patching dockerd Makefile to add kmod-ipt-raw dependency..."
-    if ! grep -q "kmod-ipt-raw" "$MAKEFILE_DIR/dockerd/Makefile"; then
-        sed -i '/+iptables \\/a \    +kmod-ipt-raw \\' "$MAKEFILE_DIR/dockerd/Makefile"
-    fi
+    echo "Patching dockerd Makefile to remove kmod/iptables dependencies..."
+    # Remove lines starting with +kmod, +iptables, +IPV6, +uci-firewall
+    sed -i '/+kmod/d' "$MAKEFILE_DIR/dockerd/Makefile"
+    sed -i '/+iptables/d' "$MAKEFILE_DIR/dockerd/Makefile"
+    sed -i '/+IPV6/d' "$MAKEFILE_DIR/dockerd/Makefile"
+    sed -i '/+uci-firewall/d' "$MAKEFILE_DIR/dockerd/Makefile"
 fi

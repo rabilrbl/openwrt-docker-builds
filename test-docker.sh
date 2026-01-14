@@ -14,6 +14,7 @@ CACHE_DIR="$(pwd)/cache"
 SDK_CACHE_DIR="${CACHE_DIR}/sdk-${SAFE_VERSION}-${SAFE_TARGET}"
 DL_CACHE_DIR="${CACHE_DIR}/dl"
 FEEDS_CACHE_DIR="${CACHE_DIR}/feeds"
+CCACHE_HOST_DIR="${CACHE_DIR}/ccache"
 
 echo "Building Docker image..."
 docker build -t $IMAGE_NAME -f Dockerfile.test .
@@ -22,11 +23,13 @@ echo "Preparing Cache..."
 mkdir -p "$SDK_CACHE_DIR"
 mkdir -p "$DL_CACHE_DIR"
 mkdir -p "$FEEDS_CACHE_DIR"
+mkdir -p "$CCACHE_HOST_DIR"
 
 # Ensure permissions
 chmod 777 "$SDK_CACHE_DIR"
 chmod 777 "$DL_CACHE_DIR"
 chmod 777 "$FEEDS_CACHE_DIR"
+chmod 777 "$CCACHE_HOST_DIR"
 
 echo "Running build container..."
 echo "  OpenWrt Version: $OPENWRT_VERSION"
@@ -41,6 +44,8 @@ docker run --rm \
     -v "$SDK_CACHE_DIR":/home/builder/sdk \
     -v "$DL_CACHE_DIR":/home/builder/sdk/dl \
     -v "$FEEDS_CACHE_DIR":/home/builder/sdk/feeds \
+    -v "$CCACHE_HOST_DIR":/home/builder/.ccache \
+    -e CCACHE_DIR=/home/builder/.ccache \
     $IMAGE_NAME \
     "$OPENWRT_VERSION" "$TARGET"
 

@@ -42,16 +42,6 @@ jobs:
       - name: Resolve SDK URL
         id: sdk_config
         run: ./scripts/setup_sdk.sh resolve
-
-      - name: Cache SDK
-        id: cache-sdk
-        uses: actions/cache@v4
-        with:
-          path: sdk
-          key: ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ steps.sdk_config.outputs.filename }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-sdk-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
-
       - name: Download and Setup SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: ./scripts/setup_sdk.sh setup
@@ -61,14 +51,6 @@ jobs:
           git config --global http.postBuffer 524288000
           git config --global http.lowSpeedLimit 0
           git config --global http.lowSpeedTime 999999  # Effectively disable timeout
-
-      - name: Cache Feeds
-        uses: actions/cache@v4
-        with:
-          path: sdk/feeds
-          key: ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-feeds-${{ env.OPENWRT_VERSION }}-
 
       - name: Update and install feeds with retry
         working-directory: ./sdk
@@ -88,6 +70,15 @@ jobs:
         working-directory: ./sdk
         run: ./scripts/feeds install docker dockerd containerd runc docker-compose
 
+      - name: Cache Ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
+            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-
+
       - name: Cache Build Artifacts
         uses: actions/cache@v4
         with:
@@ -102,6 +93,8 @@ jobs:
 
       - name: Compile Packages
         working-directory: ./sdk
+        env:
+          CCACHE_DIR: ~/.ccache
         run: ../scripts/compile.sh
 
       - name: Collect Artifacts
