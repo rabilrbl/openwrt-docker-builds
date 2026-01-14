@@ -103,14 +103,20 @@ jobs:
       - name: Compile Packages
         working-directory: ./sdk
         run: ../scripts/compile.sh
+
       - name: Collect Artifacts
+        working-directory: ./sdk
         run: |
           mkdir -p output
-          find sdk/bin/packages -name "docker*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "dockerd*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "containerd*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "runc*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "docker-compose*.ipk" -exec cp {} output/ \;
+          for ext in ipk apk; do
+              find bin/packages -name "docker*.$ext" -exec cp {} ../output/ \;
+              find bin/packages -name "dockerd*.$ext" -exec cp {} ../output/ \;
+              find bin/packages -name "containerd*.$ext" -exec cp {} ../output/ \;
+              find bin/packages -name "runc*.$ext" -exec cp {} ../output/ \;
+              find bin/packages -name "docker-compose*.$ext" -exec cp {} ../output/ \;
+              find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} ../output/ \;
+          done
+
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
@@ -118,7 +124,7 @@ jobs:
         with:
           tag_name: "docker-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}"
           name: "Docker ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})"
-          files: output/*.ipk
+          files: output/*
           body: |
              **Target:** ${{ env.TARGET }}
              **Components:**
