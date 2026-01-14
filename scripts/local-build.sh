@@ -29,11 +29,26 @@ cd sdk
 # 6. Collect Artifacts
 echo "Collecting artifacts..."
 mkdir -p ../output
-find bin/packages -name "docker*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "dockerd*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "containerd*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "runc*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "docker-compose*.ipk" -exec cp {} ../output/ \;
-find bin/packages -name "luci-lib-docker*.ipk" -exec cp {} ../output/ \;
+
+# Detect package format (APK for 25.12+ or IPK for older versions)
+if find bin/packages -name "*.apk" 2>/dev/null | grep -q .; then
+  echo "Detected APK packages (OpenWrt 25.12+)"
+  PKG_EXT="apk"
+else
+  echo "Detected IPK packages (OpenWrt 24.10 and earlier)"
+  PKG_EXT="ipk"
+fi
+
+echo "Collecting .$PKG_EXT files..."
+find bin/packages -name "docker*.$PKG_EXT" -exec cp {} ../output/ \; || true
+find bin/packages -name "dockerd*.$PKG_EXT" -exec cp {} ../output/ \; || true
+find bin/packages -name "containerd*.$PKG_EXT" -exec cp {} ../output/ \; || true
+find bin/packages -name "runc*.$PKG_EXT" -exec cp {} ../output/ \; || true
+find bin/packages -name "docker-compose*.$PKG_EXT" -exec cp {} ../output/ \; || true
+find bin/packages -name "luci-lib-docker*.$PKG_EXT" -exec cp {} ../output/ \; || true
+
+# List what we found
+echo "Collected packages:"
+ls -lh ../output/ || echo "No packages found!"
 
 echo "Build complete! Artifacts are in output/"

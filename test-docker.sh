@@ -44,4 +44,4 @@ docker run --rm \
     $IMAGE_NAME \
     "$OPENWRT_VERSION" "$TARGET"
 
-echo "Done. Check output/ directory for .ipk files."
+echo "Done. Check output/ directory for .apk (OpenWrt 25.12+) or .ipk (24.10 and earlier) files."

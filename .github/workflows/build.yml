@@ -106,11 +106,32 @@ jobs:
       - name: Collect Artifacts
         run: |
           mkdir -p output
-          find sdk/bin/packages -name "docker*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "dockerd*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "containerd*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "runc*.ipk" -exec cp {} output/ \;
-          find sdk/bin/packages -name "docker-compose*.ipk" -exec cp {} output/ \;
+          
+          # Detect package format (APK for 25.12+ or IPK for older versions)
+          if find sdk/bin/packages -name "*.apk" 2>/dev/null | grep -q .; then
+            echo "Detected APK packages (OpenWrt 25.12+)"
+            PKG_EXT="apk"
+          else
+            echo "Detected IPK packages (OpenWrt 24.10 and earlier)"
+            PKG_EXT="ipk"
+          fi
+          
+          echo "Collecting .$PKG_EXT files..."
+          find sdk/bin/packages -name "docker*.$PKG_EXT" -exec cp {} output/ \; || true
+          find sdk/bin/packages -name "dockerd*.$PKG_EXT" -exec cp {} output/ \; || true
+          find sdk/bin/packages -name "containerd*.$PKG_EXT" -exec cp {} output/ \; || true
+          find sdk/bin/packages -name "runc*.$PKG_EXT" -exec cp {} output/ \; || true
+          find sdk/bin/packages -name "docker-compose*.$PKG_EXT" -exec cp {} output/ \; || true
+          
+          # List what we found
+          echo "Collected packages:"
+          ls -lh output/ || echo "No packages found!"
+          
+          # Debug: show bin directory structure if no packages found
+          if [ -z "$(ls -A output/)" ]; then
+            echo "Warning: No packages collected. Showing bin directory structure:"
+            find sdk/bin -type f -name "*.apk" -o -name "*.ipk" | head -20 || true
+          fi
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
@@ -118,7 +139,7 @@ jobs:
         with:
           tag_name: "docker-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}"
           name: "Docker ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})"
-          files: output/*.ipk
+          files: output/*
           body: |
              **Target:** ${{ env.TARGET }}
              **Components:**
