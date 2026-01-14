@@ -8,7 +8,7 @@ The official OpenWrt Docker packages are often outdated and lag behind the lates
 
 - ✅ Fetches the **latest Docker, Dockerd, and Containerd versions** from their respective GitHub repositories
 - ✅ Builds packages for your specific OpenWrt architecture
-- ✅ Publishes pre-compiled `.ipk` packages as GitHub releases
+- ✅ Publishes pre-compiled packages as GitHub releases
 - ✅ Runs weekly to ensure you always have access to the newest versions
 
 ## 🚀 How to Use This Repository
@@ -18,9 +18,13 @@ The official OpenWrt Docker packages are often outdated and lag behind the lates
 **Note:** This repository only builds packages for **Raspberry Pi 5** (`bcm27xx/bcm2712`) by default. If you need packages for a different architecture, skip to **Option 2** below.
 
 1. Visit the [Releases page](https://github.com/rabilrbl/openwrt-docker-builds/releases)
-2. Download the `.ipk` files for Raspberry Pi 5
+2. Download the package files for Raspberry Pi 5:
+   - For **OpenWrt 25.12+ (snapshots)**: Download `.apk` files (uses APK package manager)
+   - For **OpenWrt 24.10 and earlier**: Download `.ipk` files (uses OPKG package manager)
 3. Transfer them to your OpenWrt router
-4. Install using `opkg install <package>.ipk`
+4. Install using the appropriate package manager:
+   - APK: `apk add <package>.apk`
+   - OPKG: `opkg install <package>.ipk`
 
 ### Option 2: Fork and Build Your Own
 
@@ -92,8 +96,10 @@ This repository can build Docker packages for **any architecture supported by Op
 
 You can build packages for:
 
-- **`snapshot`**: The latest development version (recommended for newest features)
-- **Stable releases**: e.g., `24.10.0`, `23.05.3`, `23.05.2`, etc.
+- **`snapshot`**: The latest development version (25.12+, uses APK package manager)
+- **Stable releases**: e.g., `24.10.0`, `23.05.3`, `23.05.2`, etc. (use OPKG package manager)
+
+**Important:** OpenWrt 25.12 and newer snapshots use the **APK** (Alpine Package Keeper) package manager instead of OPKG. This repository automatically detects and builds the appropriate package format (`.apk` or `.ipk`) based on the version you select.
 
 To find available versions:
 - Visit https://downloads.openwrt.org/releases/
@@ -101,7 +107,7 @@ To find available versions:
 
 ## 📥 Installation on OpenWrt
 
-After downloading the `.ipk` packages:
+### For OpenWrt 24.10 and earlier (OPKG/.ipk packages):
 
 1. **Transfer packages to your router:**
    ```bash
@@ -121,6 +127,39 @@ After downloading the `.ipk` packages:
    opkg install runc*.ipk
    opkg install dockerd*.ipk
    opkg install docker*.ipk
+   ```
+
+4. **Start Docker:**
+   ```bash
+   /etc/init.d/dockerd start
+   /etc/init.d/dockerd enable
+   ```
+
+5. **Verify installation:**
+   ```bash
+   docker version
+   docker run hello-world
+   ```
+
+### For OpenWrt 25.12+ snapshots (APK/.apk packages):
+
+1. **Transfer packages to your router:**
+   ```bash
+   scp *.apk root@192.168.1.1:/tmp/
+   ```
+
+2. **SSH into your router:**
+   ```bash
+   ssh root@192.168.1.1
+   ```
+
+3. **Install the packages:**
+   ```bash
+   cd /tmp
+   apk add containerd*.apk
+   apk add runc*.apk
+   apk add dockerd*.apk
+   apk add docker*.apk
    ```
 
 4. **Start Docker:**
