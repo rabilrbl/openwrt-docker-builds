@@ -102,12 +102,12 @@ jobs:
         run: |
           mkdir -p output
           for ext in ipk apk; do
-              find bin/packages -name "docker*.$ext" -exec cp {} ../output/ \;
-              find bin/packages -name "dockerd*.$ext" -exec cp {} ../output/ \;
-              find bin/packages -name "containerd*.$ext" -exec cp {} ../output/ \;
-              find bin/packages -name "runc*.$ext" -exec cp {} ../output/ \;
-              find bin/packages -name "docker-compose*.$ext" -exec cp {} ../output/ \;
-              find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} ../output/ \;
+              find bin -name "docker*.$ext" -exec cp {} ../output/ \;
+              find bin -name "dockerd*.$ext" -exec cp {} ../output/ \;
+              find bin -name "containerd*.$ext" -exec cp {} ../output/ \;
+              find bin -name "runc*.$ext" -exec cp {} ../output/ \;
+              find bin -name "docker-compose*.$ext" -exec cp {} ../output/ \;
+              find bin -name "luci-lib-docker*.$ext" -exec cp {} ../output/ \;
           done
 
 
