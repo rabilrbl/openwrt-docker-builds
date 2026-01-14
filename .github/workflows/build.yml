@@ -107,8 +107,15 @@ jobs:
         run: |
           mkdir -p output
           
-          # Detect package format (APK for 25.12+ or IPK for older versions)
-          if find sdk/bin/packages -name "*.apk" 2>/dev/null | grep -q .; then
+          # First, try to detect package format by searching the entire bin directory
+          echo "Searching for packages in sdk/bin..."
+          APK_COUNT=$(find sdk/bin -name "*.apk" 2>/dev/null | wc -l)
+          IPK_COUNT=$(find sdk/bin -name "*.ipk" 2>/dev/null | wc -l)
+          
+          echo "Found $IPK_COUNT .ipk files and $APK_COUNT .apk files"
+          
+          # Determine package extension
+          if [ "$APK_COUNT" -gt 0 ]; then
             echo "Detected APK packages (OpenWrt 25.12+)"
             PKG_EXT="apk"
           else
@@ -116,21 +123,27 @@ jobs:
             PKG_EXT="ipk"
           fi
           
-          echo "Collecting .$PKG_EXT files..."
-          find sdk/bin/packages -name "docker*.$PKG_EXT" -exec cp {} output/ \; || true
-          find sdk/bin/packages -name "dockerd*.$PKG_EXT" -exec cp {} output/ \; || true
-          find sdk/bin/packages -name "containerd*.$PKG_EXT" -exec cp {} output/ \; || true
-          find sdk/bin/packages -name "runc*.$PKG_EXT" -exec cp {} output/ \; || true
-          find sdk/bin/packages -name "docker-compose*.$PKG_EXT" -exec cp {} output/ \; || true
+          echo "Collecting .$PKG_EXT files from sdk/bin..."
+          # Search in entire bin directory to handle different OpenWrt versions
+          find sdk/bin -name "docker*.$PKG_EXT" -exec cp {} output/ \; 2>/dev/null || true
+          find sdk/bin -name "dockerd*.$PKG_EXT" -exec cp {} output/ \; 2>/dev/null || true
+          find sdk/bin -name "containerd*.$PKG_EXT" -exec cp {} output/ \; 2>/dev/null || true
+          find sdk/bin -name "runc*.$PKG_EXT" -exec cp {} output/ \; 2>/dev/null || true
+          find sdk/bin -name "docker-compose*.$PKG_EXT" -exec cp {} output/ \; 2>/dev/null || true
           
           # List what we found
+          echo ""
           echo "Collected packages:"
-          ls -lh output/ || echo "No packages found!"
+          ls -lh output/ 2>/dev/null || echo "No packages found!"
           
           # Debug: show bin directory structure if no packages found
-          if [ -z "$(ls -A output/)" ]; then
+          if [ -z "$(ls -A output/ 2>/dev/null)" ]; then
+            echo ""
             echo "Warning: No packages collected. Showing bin directory structure:"
-            find sdk/bin -type f -name "*.apk" -o -name "*.ipk" | head -20 || true
+            find sdk/bin -type f \( -name "*.apk" -o -name "*.ipk" \) 2>/dev/null | head -30 || true
+            echo ""
+            echo "Full bin directory tree:"
+            ls -laR sdk/bin/ | head -100 || true
           fi
 
       - name: Upload Release
