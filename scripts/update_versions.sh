@@ -55,10 +55,12 @@ update_makefile() {
     fi
     
     # Validate hash is a valid SHA256 (64 hex characters)
-    if [ -z "$NEW_HASH" ] || [ "$NEW_HASH" = "x" ] || [ "$NEW_HASH" = "skip" ]; then
-        echo "Error: Invalid hash for $PKG_NAME: '$NEW_HASH'"
-        return 1
-    fi
+    case "$NEW_HASH" in
+        ""|"x"|"skip")
+            echo "Error: Invalid hash for $PKG_NAME: '$NEW_HASH'"
+            return 1
+            ;;
+    esac
     
     if ! echo "$NEW_HASH" | grep -qE '^[a-fA-F0-9]{64}$'; then
         echo "Error: Hash for $PKG_NAME is not a valid SHA256: '$NEW_HASH'"
@@ -156,12 +158,6 @@ update_makefile "dockerd" "$CLEAN_VERSION" "$MOBY_HASH" "$MAKEFILE_DIR/dockerd/M
 update_makefile "docker" "$CLEAN_VERSION" "$CLI_HASH" "$MAKEFILE_DIR/docker/Makefile" "$CLI_TAG" "$CLI_COMMIT" || FAILED=1
 update_makefile "containerd" "$CT_VERSION" "$CT_HASH" "$MAKEFILE_DIR/containerd/Makefile" "$CT_TAG" "$CT_COMMIT" || FAILED=1
 
-if [ $FAILED -eq 1 ]; then
-    echo ""
-    echo "Error: Failed to update one or more Makefiles"
-    exit 1
-fi
-
 # Update runc to latest
 RUNC_VERSION="1.3.4"
 RUNC_TAG="v$RUNC_VERSION"
@@ -170,10 +166,7 @@ echo "Calculating hash for $RUNC_URL"
 RUNC_HASH=$(get_tarball_hash "$RUNC_URL")
 echo "Fetching commit SHA for $RUNC_TAG"
 RUNC_COMMIT=$(get_commit_sha "opencontainers/runc" "$RUNC_TAG")
-update_makefile "runc" "$RUNC_VERSION" "$RUNC_HASH" "$MAKEFILE_DIR/runc/Makefile" "$RUNC_TAG" "$RUNC_COMMIT" || {
-    echo "Error: Failed to update runc Makefile"
-    exit 1
-}
+update_makefile "runc" "$RUNC_VERSION" "$RUNC_HASH" "$MAKEFILE_DIR/runc/Makefile" "$RUNC_TAG" "$RUNC_COMMIT" || FAILED=1
 
 # Docker Compose
 # Only v2 is supported as a Go binary
@@ -187,16 +180,20 @@ if [ "$COMPOSE_TAG" != "null" ] && [ -n "$COMPOSE_TAG" ]; then
     COMPOSE_COMMIT=$(get_commit_sha "docker/compose" "$COMPOSE_TAG")
     
     echo "  Docker Compose: $COMPOSE_VERSION ($COMPOSE_HASH) Commit: $COMPOSE_COMMIT"
-    update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT" || {
-        echo "Error: Failed to update docker-compose Makefile"
-        exit 1
-    }
+    update_makefile "docker-compose" "$COMPOSE_VERSION" "$COMPOSE_HASH" "$MAKEFILE_DIR/docker-compose/Makefile" "$COMPOSE_TAG" "$COMPOSE_COMMIT" || FAILED=1
 
     # Fix Go package path for v5+
     if [[ "$COMPOSE_VERSION" == 5.* ]]; then
         echo "  Updating Go package path to v5..."
         sed -i "s|github.com/docker/compose/v2|github.com/docker/compose/v5|g" "$MAKEFILE_DIR/docker-compose/Makefile"
     fi
+fi
+
+# Check if any updates failed
+if [ $FAILED -eq 1 ]; then
+    echo ""
+    echo "Error: Failed to update one or more Makefiles"
+    exit 1
 fi
 
 # Patch containerd Makefile to remove legacy shims (removed in 2.0)
