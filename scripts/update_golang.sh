@@ -11,10 +11,10 @@ echo "Checking Golang version..."
 
 # Logic extracted from build.yml
 # Only update if forced or missing
-if [ -d "feeds/packages/lang/golang" ] && [ "${UPDATE_GOLANG}" != "1" ]; then
-    echo "Golang feed already exists. Skipping update (set UPDATE_GOLANG=1 to force)."
-    exit 0
-fi
+#if [ -d "feeds/packages/lang/golang" ] && [ "${UPDATE_GOLANG}" != "1" ]; then
+#    echo "Golang feed already exists. Skipping update (set UPDATE_GOLANG=1 to force)."
+#    exit 0
+#fi
 
 # Remove existing golang feed if present (and we are forcing update)
 if [ -d "feeds/packages/lang/golang" ]; then
