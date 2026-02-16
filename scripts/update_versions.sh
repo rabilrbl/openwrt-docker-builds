@@ -231,7 +231,6 @@ echo "  SDK current Go default: ${SDK_GO_DEFAULT:-unknown} (major.minor: $SDK_GO
 upgrade_golang_feed() {
     rm -rf "$GOLANG_DIR"
     git clone --depth 1 --filter=blob:none --sparse \
-        -c http.sslVerify=false \
         https://github.com/openwrt/packages.git /tmp/openwrt-packages
     (cd /tmp/openwrt-packages && git sparse-checkout set lang/golang)
     cp -r /tmp/openwrt-packages/lang/golang "$GOLANG_DIR"
