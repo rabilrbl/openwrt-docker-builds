@@ -51,17 +51,16 @@ jobs:
             bash -c '
               cd /builder &&
               if [ ! -d ./scripts ]; then bash ./setup.sh; fi &&
-              ./scripts/feeds update packages luci &&
+              ./scripts/feeds update packages &&
               make defconfig &&
               bash /scripts/update_versions.sh &&
-              ./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker &&
+              ./scripts/feeds install docker dockerd containerd runc docker-compose &&
               make defconfig &&
               make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/luci-lib-docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               mkdir -p /output &&
               for ext in ipk apk; do
                 find bin/packages -name "docker*.$ext" -exec cp {} /output/ \;
@@ -69,7 +68,6 @@ jobs:
                 find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \;
                 find bin/packages -name "runc*.$ext" -exec cp {} /output/ \;
                 find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \;
-                find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} /output/ \;
               done
             '
 
@@ -83,7 +81,8 @@ jobs:
           body: |
              **Target:** ${{ env.TARGET }}
              **Components:**
-             * Docker/Dockerd
+             * Docker CLI
+             * Dockerd (Docker Engine)
              * Containerd
              * Runc
              * Docker Compose

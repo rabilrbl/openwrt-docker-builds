@@ -183,11 +183,14 @@ The workflow builds the following packages:
 - **dockerd** - Docker daemon (engine)
 - **containerd** - Container runtime
 - **runc** - Low-level container runtime
+- **docker-compose** - Docker Compose
 
 All versions are automatically fetched from the latest GitHub releases of:
 - [moby/moby](https://github.com/moby/moby) (Docker engine)
 - [docker/cli](https://github.com/docker/cli) (Docker CLI)
 - [containerd/containerd](https://github.com/containerd/containerd) (Containerd)
+- [opencontainers/runc](https://github.com/opencontainers/runc) (Runc)
+- [docker/compose](https://github.com/docker/compose) (Docker Compose)
 
 ## 🛠️ How It Works
 
