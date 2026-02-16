@@ -224,25 +224,11 @@ if [ -f "$GOLANG_DIR/golang-values.mk" ]; then
     SDK_GO_DEFAULT=$(grep '^GO_DEFAULT_VERSION:=' "$GOLANG_DIR/golang-values.mk" \
         | sed -E 's/^GO_DEFAULT_VERSION:=(.*)/\1/')
 fi
-echo "  SDK current Go default: ${SDK_GO_DEFAULT:-unknown}"
+SDK_GO_MM=$(go_major_minor "${SDK_GO_DEFAULT:-0.0}")
+echo "  SDK current Go default: ${SDK_GO_DEFAULT:-unknown} (major.minor: $SDK_GO_MM)"
 
-# Upgrade golang feed if SDK's Go is too old
-if [ -n "$REQUIRED_GO_MM" ] && [ -n "$SDK_GO_DEFAULT" ]; then
-    if ! version_ge "$SDK_GO_DEFAULT" "$REQUIRED_GO_MM"; then
-        echo "  SDK Go $SDK_GO_DEFAULT < required $REQUIRED_GO_MM — upgrading golang feed..."
-        rm -rf "$GOLANG_DIR"
-        git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/openwrt/packages.git /tmp/openwrt-packages
-        (cd /tmp/openwrt-packages && git sparse-checkout set lang/golang)
-        cp -r /tmp/openwrt-packages/lang/golang "$GOLANG_DIR"
-        rm -rf /tmp/openwrt-packages
-        ./scripts/feeds install -f golang
-        echo "  Golang feed upgraded."
-    else
-        echo "  SDK Go $SDK_GO_DEFAULT >= required $REQUIRED_GO_MM — no upgrade needed."
-    fi
-elif [ -n "$REQUIRED_GO_MM" ]; then
-    echo "  Could not detect SDK Go version, upgrading golang feed to be safe..."
+# Upgrade golang feed from openwrt/packages if SDK's Go is too old
+upgrade_golang_feed() {
     rm -rf "$GOLANG_DIR"
     git clone --depth 1 --filter=blob:none --sparse \
         https://github.com/openwrt/packages.git /tmp/openwrt-packages
@@ -251,6 +237,15 @@ elif [ -n "$REQUIRED_GO_MM" ]; then
     rm -rf /tmp/openwrt-packages
     ./scripts/feeds install -f golang
     echo "  Golang feed upgraded."
+}
+
+if [ -n "$REQUIRED_GO_MM" ]; then
+    if ! version_ge "$SDK_GO_MM" "$REQUIRED_GO_MM"; then
+        echo "  SDK Go $SDK_GO_MM < required $REQUIRED_GO_MM — upgrading golang feed..."
+        upgrade_golang_feed
+    else
+        echo "  SDK Go $SDK_GO_MM >= required $REQUIRED_GO_MM — no upgrade needed."
+    fi
 fi
 
 # ─── Update package Makefiles ────────────────────────────────────────────────
@@ -275,7 +270,7 @@ if [ -n "$COMPOSE_VERSION" ]; then
 
     # Dynamically fix Go module path if compose major version changed
     COMPOSE_MAJOR=$(echo "$COMPOSE_VERSION" | cut -d. -f1)
-    if [ "$COMPOSE_MAJOR" -ge 3 ] 2>/dev/null; then
+    if [ "$COMPOSE_MAJOR" -ge 2 ] 2>/dev/null; then
         CURRENT_MODULE=$(grep -oE 'github\.com/docker/compose/v[0-9]+' "$MAKEFILE_DIR/docker-compose/Makefile" | head -1 || true)
         EXPECTED_MODULE="github.com/docker/compose/v${COMPOSE_MAJOR}"
         if [ -n "$CURRENT_MODULE" ] && [ "$CURRENT_MODULE" != "$EXPECTED_MODULE" ]; then
