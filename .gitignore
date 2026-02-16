@@ -1,8 +1,8 @@
-# Local test artifacts
-cache/
+# Build artifacts
 output/
+# Legacy local test artifacts
+cache/
 sdk/
 sdk.archive
 feeds/
-# Temporary build files
 tmp_packages/

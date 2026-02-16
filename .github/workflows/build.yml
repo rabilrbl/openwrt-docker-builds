@@ -26,89 +26,63 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Resolve SDK Docker Tag
+        id: sdk_tag
         run: |
-          sudo apt-get update
-          # Added 'jq' for reliable JSON parsing and 'coreutils' for hash utilities (md5sum, sha256sum)
-          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
-            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq coreutils
+          TARGET="${{ env.TARGET }}"
+          TAG="${TARGET//\//-}"
+          VERSION="${{ env.OPENWRT_VERSION }}"
+          if [ "$VERSION" != "snapshot" ]; then
+            TAG="${TAG}-v${VERSION}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using SDK image: openwrt/sdk:${TAG}"
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: false
-
-      - name: Resolve SDK URL
-        id: sdk_config
-        run: ./scripts/setup_sdk.sh resolve
-      - name: Download and Setup SDK
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: ./scripts/setup_sdk.sh setup
-
-      - name: Configure Git for large repositories
+      - name: Prepare SDK Image
         run: |
-          git config --global http.postBuffer 524288000
-          git config --global http.lowSpeedLimit 0
-          git config --global http.lowSpeedTime 999999  # Effectively disable timeout
+          docker build -t openwrt-sdk-custom --build-arg SDK_TAG=${{ steps.sdk_tag.outputs.tag }} - <<'DOCKERFILE'
+          ARG SDK_TAG
+          FROM openwrt/sdk:${SDK_TAG}
+          USER root
+          RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf && rm -rf /var/lib/apt/lists/*
+          USER buildbot
+          DOCKERFILE
 
-      - name: Update and install feeds with retry
-        working-directory: ./sdk
-        run: ../scripts/update_feeds.sh
-
-      - name: Upgrade Golang
-        working-directory: ./sdk
-        run: ../scripts/update_golang.sh
-
-      - name: Automate Version Updates
-        working-directory: ./sdk
+      - name: Build Packages in SDK Container
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ../scripts/update_versions.sh
-
-      - name: Register Packages
-        working-directory: ./sdk
-        run: ./scripts/feeds install docker dockerd containerd runc docker-compose
-
-      - name: Cache Ccache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.ccache
-          key: ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
-            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-
-
-      - name: Cache Build Artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            sdk/build_dir
-            sdk/staging_dir
-            sdk/dl
-          key: ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
-            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-
-
-      - name: Compile Packages
-        working-directory: ./sdk
-        env:
-          CCACHE_DIR: /home/runner/.ccache
-        run: ../scripts/compile.sh
-
-      - name: Collect Artifacts
         run: |
           mkdir -p output
-          for ext in ipk apk; do
-              find sdk/bin/packages -name "docker*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "dockerd*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "containerd*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "runc*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "docker-compose*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "luci-lib-docker*.$ext" -exec cp {} output/ \;
-          done
-
+          chmod 777 output
+          docker run --rm \
+            -v "${{ github.workspace }}/scripts":/scripts:ro \
+            -v "${{ github.workspace }}/output":/output \
+            -e GH_TOKEN="${GH_TOKEN}" \
+            openwrt-sdk-custom \
+            bash -c '
+              cd /builder &&
+              if [ ! -d ./scripts ]; then bash ./setup.sh; fi &&
+              ./scripts/feeds update packages &&
+              make defconfig &&
+              bash /scripts/update_versions.sh &&
+              ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp tini &&
+              make defconfig &&
+              make package/libseccomp/compile -j$(nproc) V=s &&
+              make package/tini/compile -j$(nproc) V=s &&
+              make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              mkdir -p /output &&
+              for ext in ipk apk; do
+                find bin/packages -name "docker*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "dockerd*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "runc*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \;
+              done
+            '
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
@@ -120,7 +94,8 @@ jobs:
           body: |
              **Target:** ${{ env.TARGET }}
              **Components:**
-             * Docker/Dockerd
+             * Docker CLI
+             * Dockerd (Docker Engine)
              * Containerd
              * Runc
              * Docker Compose
