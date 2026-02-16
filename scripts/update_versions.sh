@@ -237,9 +237,48 @@ upgrade_golang_feed() {
     rm -rf /tmp/openwrt-packages
     ./scripts/feeds install -f golang
     make defconfig
-    echo "  Compiling new Go host toolchain..."
-    make package/golang/host/compile -j$(nproc) V=s
-    echo "  Golang feed upgraded and compiled."
+
+    # Read full Go version from the upgraded feed Makefile
+    local go_mm go_patch go_full go_dir_name
+    go_mm=$(grep '^GO_VERSION_MAJOR_MINOR:=' "$GOLANG_DIR"/golang*/Makefile 2>/dev/null \
+        | head -1 | sed 's/.*:=//')
+    go_patch=$(grep '^GO_VERSION_PATCH:=' "$GOLANG_DIR"/golang*/Makefile 2>/dev/null \
+        | head -1 | sed 's/.*:=//')
+    if [ -n "$go_patch" ] && [ "$go_patch" != "0" ]; then
+        go_full="${go_mm}.${go_patch}"
+    else
+        go_full="${go_mm}.0"
+    fi
+
+    # Detect host OS and architecture
+    local host_os host_arch
+    host_os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    host_arch=$(uname -m)
+    case "$host_arch" in
+        x86_64)  host_arch="amd64" ;;
+        aarch64) host_arch="arm64" ;;
+        armv*)   host_arch="armv6l" ;;
+    esac
+
+    echo "  Downloading pre-compiled Go ${go_full} (${host_os}-${host_arch})..."
+    local go_url="https://go.dev/dl/go${go_full}.${host_os}-${host_arch}.tar.gz"
+    local go_root="staging_dir/hostpkg/lib/go-${go_mm}"
+
+    # Remove old Go installation and install new one
+    rm -rf "staging_dir/hostpkg/lib/go-"*
+    mkdir -p "$go_root"
+    curl -sL "$go_url" | tar -xz -C "$go_root" --strip-components=1
+
+    # Create symlinks expected by the SDK build system
+    mkdir -p staging_dir/hostpkg/bin
+    ln -sf "../lib/go-${go_mm}/bin/go" staging_dir/hostpkg/bin/go
+    ln -sf "../lib/go-${go_mm}/bin/gofmt" staging_dir/hostpkg/bin/gofmt
+
+    # Mark golang as already compiled so make doesn't try to rebuild it
+    mkdir -p staging_dir/hostpkg/stamp
+    touch staging_dir/hostpkg/stamp/.golang_installed
+
+    echo "  Go ${go_full} installed from pre-compiled binary."
 }
 
 if [ -n "$REQUIRED_GO_MM" ]; then
