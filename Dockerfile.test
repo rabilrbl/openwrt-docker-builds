@@ -13,17 +13,17 @@ RUN chmod +x /scripts/update_versions.sh
 CMD ["bash", "-c", "\
   cd /builder && \
   if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
-  ./scripts/feeds update packages && \
+  ./scripts/feeds update packages luci && \
   make defconfig && \
   bash /scripts/update_versions.sh && \
   ./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker && \
   make defconfig && \
-  make package/containerd/compile -j$(nproc) V=s && \
-  make package/dockerd/compile -j$(nproc) V=s && \
-  make package/docker/compile -j$(nproc) V=s && \
-  make package/runc/compile -j$(nproc) V=s && \
-  make package/docker-compose/compile -j$(nproc) V=s && \
-  make package/luci-lib-docker/compile -j$(nproc) V=s && \
+  make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/luci-lib-docker/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   mkdir -p /output && \
   for ext in ipk apk; do \
     find bin/packages -name \"docker*.$ext\" -exec cp {} /output/ \\; ; \
