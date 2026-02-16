@@ -222,6 +222,22 @@ The only addition is `scripts/update_versions.sh` which fetches the latest Docke
 - Some architectures may have missing dependencies - install them with `opkg install`
 - Check that your OpenWrt version matches the packages you downloaded
 
+### Docker Networking Issues
+
+If you encounter errors like `iptables: can't initialize iptables table 'raw': Table does not exist`, this indicates the `kmod-ipt-raw` kernel module is missing.
+
+**What causes this error?**
+Docker networking requires the iptables `raw` table for advanced packet filtering. This table is provided by the `kmod-ipt-raw` kernel module, which is not always included by default in OpenWrt.
+
+**How this repository solves it:**
+This repository automatically includes `kmod-ipt-raw` as a dependency in all built dockerd packages. The build script (`scripts/update_versions.sh`) intelligently patches the dockerd Makefile during compilation to add this dependency, regardless of the Makefile format.
+
+**Solutions:**
+
+- **If using pre-built packages from Releases**: The dependency is already included. Install all packages with your package manager (APK or OPKG will automatically install `kmod-ipt-raw` along with dockerd)
+- **If the error persists after installation**: Manually install the module: `opkg install kmod-ipt-raw` or `apk add kmod-ipt-raw`, then restart dockerd: `/etc/init.d/dockerd restart`
+- **For custom builds**: The `scripts/update_versions.sh` script automatically handles this during the build process
+
 ## 📝 License
 
 This repository contains build automation scripts. The actual Docker, Dockerd, and Containerd packages are governed by their respective licenses.
