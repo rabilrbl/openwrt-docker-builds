@@ -122,7 +122,7 @@ echo "Fetching Containerd version from Moby ($RAW_MOBY_TAG)..."
 # Try legacy path first (hack/dockerfile/install/containerd.installer)
 CT_INSTALLER_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/hack/dockerfile/install/containerd.installer"
 CT_VERSION_RAW=$(curl -sL "$CT_INSTALLER_URL" | grep 'CONTAINERD_VERSION:=' | sed -E 's/.*:=([^}]+)\}.*/\1/' || true)
-# Fallback: parse ARG CONTAINERD_VERSION from root Dockerfile (moby v28.1+)
+# Fallback: parse ARG CONTAINERD_VERSION from root Dockerfile (moby v29+)
 if [ -z "$CT_VERSION_RAW" ]; then
     CT_DOCKERFILE_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/Dockerfile"
     CT_VERSION_RAW=$(curl -sL "$CT_DOCKERFILE_URL" | grep -m1 '^ARG CONTAINERD_VERSION=' | sed -E 's/^ARG CONTAINERD_VERSION=(.*)/\1/' || true)
@@ -162,7 +162,7 @@ echo "Fetching Runc version from Moby ($RAW_MOBY_TAG)..."
 # Try legacy path first (hack/dockerfile/install/runc.installer)
 RUNC_INSTALLER_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/hack/dockerfile/install/runc.installer"
 RUNC_VERSION_RAW=$(curl -sL "$RUNC_INSTALLER_URL" | grep 'RUNC_VERSION:=' | sed -E 's/.*:=([^}]+)\}.*/\1/' || true)
-# Fallback: parse ARG RUNC_VERSION from root Dockerfile (moby v28.1+)
+# Fallback: parse ARG RUNC_VERSION from root Dockerfile (moby v29+)
 if [ -z "$RUNC_VERSION_RAW" ]; then
     RUNC_DOCKERFILE_URL="https://raw.githubusercontent.com/moby/moby/$RAW_MOBY_TAG/Dockerfile"
     RUNC_VERSION_RAW=$(curl -sL "$RUNC_DOCKERFILE_URL" | grep -m1 '^ARG RUNC_VERSION=' | sed -E 's/^ARG RUNC_VERSION=(.*)/\1/' || true)
