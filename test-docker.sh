@@ -27,6 +27,8 @@ mkdir -p output
 
 docker run --rm \
     -v "$(pwd)/output":/output \
+    -e GIT_SSL_NO_VERIFY=1 \
+    ${GH_TOKEN:+-e GH_TOKEN="$GH_TOKEN"} \
     "$IMAGE_NAME"
 
 echo "Done. Check output/ directory for built packages."

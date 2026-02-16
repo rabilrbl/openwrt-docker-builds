@@ -231,12 +231,16 @@ echo "  SDK current Go default: ${SDK_GO_DEFAULT:-unknown} (major.minor: $SDK_GO
 upgrade_golang_feed() {
     rm -rf "$GOLANG_DIR"
     git clone --depth 1 --filter=blob:none --sparse \
+        -c http.sslVerify=false \
         https://github.com/openwrt/packages.git /tmp/openwrt-packages
     (cd /tmp/openwrt-packages && git sparse-checkout set lang/golang)
     cp -r /tmp/openwrt-packages/lang/golang "$GOLANG_DIR"
     rm -rf /tmp/openwrt-packages
     ./scripts/feeds install -f golang
-    echo "  Golang feed upgraded."
+    make defconfig
+    echo "  Compiling new Go host toolchain..."
+    make package/golang/host/compile -j$(nproc) V=s
+    echo "  Golang feed upgraded and compiled."
 }
 
 if [ -n "$REQUIRED_GO_MM" ]; then
