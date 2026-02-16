@@ -12,7 +12,7 @@ RUN chmod +x /scripts/update_versions.sh
 # https://github.com/openwrt/docker#sdk-example
 CMD bash -c '\
   cd /builder && \
-  [ ! -d ./scripts ] && bash ./setup.sh; \
+  if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
   ./scripts/feeds update packages && \
   make defconfig && \
   bash /scripts/update_versions.sh && \

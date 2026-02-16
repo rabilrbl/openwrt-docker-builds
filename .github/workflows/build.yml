@@ -50,7 +50,7 @@ jobs:
             openwrt/sdk:${{ steps.sdk_tag.outputs.tag }} \
             bash -c '
               cd /builder &&
-              [ ! -d ./scripts ] && bash ./setup.sh
+              if [ ! -d ./scripts ]; then bash ./setup.sh; fi &&
               ./scripts/feeds update packages &&
               make defconfig &&
               bash /scripts/update_versions.sh &&

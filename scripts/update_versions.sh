@@ -10,12 +10,14 @@ fi
 
 # --- Helper Functions ---
 get_latest_tag() {
-    local auth_header=""
+    local repo="$1"
     if [ -n "$GH_TOKEN" ]; then
-        auth_header="-H \"Authorization: token $GH_TOKEN\""
+        curl -s -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$repo/releases/latest" \
+            | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
+    else
+        curl -s "https://api.github.com/repos/$repo/releases/latest" \
+            | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
     fi
-    eval curl -s $auth_header "https://api.github.com/repos/$1/releases/latest" \
-        | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
 }
 
 get_tarball_hash() {
@@ -33,12 +35,13 @@ clean_version() {
 get_commit_sha() {
     local repo="$1"
     local tag="$2"
-    local auth_header=""
     if [ -n "$GH_TOKEN" ]; then
-        auth_header="-H \"Authorization: token $GH_TOKEN\""
+        curl -s -H "Authorization: token $GH_TOKEN" "https://api.github.com/repos/$repo/commits/$tag" \
+            | grep '"sha"' | head -1 | sed -E 's/.*"sha": *"([^"]+)".*/\1/'
+    else
+        curl -s "https://api.github.com/repos/$repo/commits/$tag" \
+            | grep '"sha"' | head -1 | sed -E 's/.*"sha": *"([^"]+)".*/\1/'
     fi
-    eval curl -s $auth_header "https://api.github.com/repos/$repo/commits/$tag" \
-        | grep '"sha"' | head -1 | sed -E 's/.*"sha": *"([^"]+)".*/\1/'
 }
 
 update_makefile() {
