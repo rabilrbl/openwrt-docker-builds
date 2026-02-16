@@ -346,10 +346,11 @@ if [ -f "$MAKEFILE_DIR/docker/Makefile" ]; then
     fi
 fi
 
-# Patch dockerd Makefile to add kmod-ipt-raw dependency (needed for Docker networking)
+# Patch dockerd Build/Prepare to skip vendored version checks and git-short-commit
+# These checks reference hack/dockerfile/install/*.installer files that don't exist
+# in Moby v29+ and require network access for git-short-commit.sh
 if [ -f "$MAKEFILE_DIR/dockerd/Makefile" ]; then
-    if ! grep -q "kmod-ipt-raw" "$MAKEFILE_DIR/dockerd/Makefile"; then
-        echo "Patching dockerd Makefile to add kmod-ipt-raw dependency..."
-        sed -i '/+iptables \\/a \    +kmod-ipt-raw \\' "$MAKEFILE_DIR/dockerd/Makefile"
-    fi
+    echo "Patching dockerd Makefile to skip vendored version checks..."
+    # Replace the entire Build/Prepare block with just the default prepare
+    sed -i '/^define Build\/Prepare$/,/^endef$/c\define Build/Prepare\n\t\$(Build/Prepare/Default)\nendef' "$MAKEFILE_DIR/dockerd/Makefile"
 fi

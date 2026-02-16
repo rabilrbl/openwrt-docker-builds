@@ -38,6 +38,16 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using SDK image: openwrt/sdk:${TAG}"
 
+      - name: Prepare SDK Image
+        run: |
+          docker build -t openwrt-sdk-custom --build-arg SDK_TAG=${{ steps.sdk_tag.outputs.tag }} - <<'DOCKERFILE'
+          ARG SDK_TAG
+          FROM openwrt/sdk:${SDK_TAG}
+          USER root
+          RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf && rm -rf /var/lib/apt/lists/*
+          USER buildbot
+          DOCKERFILE
+
       - name: Build Packages in SDK Container
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,19 +58,21 @@ jobs:
             -v "${{ github.workspace }}/scripts":/scripts:ro \
             -v "${{ github.workspace }}/output":/output \
             -e GH_TOKEN="${GH_TOKEN}" \
-            openwrt/sdk:${{ steps.sdk_tag.outputs.tag }} \
+            openwrt-sdk-custom \
             bash -c '
               cd /builder &&
               if [ ! -d ./scripts ]; then bash ./setup.sh; fi &&
               ./scripts/feeds update packages &&
               make defconfig &&
               bash /scripts/update_versions.sh &&
-              ./scripts/feeds install docker dockerd containerd runc docker-compose &&
+              ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp tini &&
               make defconfig &&
+              make package/libseccomp/compile -j$(nproc) V=s &&
+              make package/tini/compile -j$(nproc) V=s &&
               make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
+              make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
               mkdir -p /output &&
               for ext in ipk apk; do

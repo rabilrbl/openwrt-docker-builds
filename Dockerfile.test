@@ -1,6 +1,10 @@
 ARG SDK_TAG=bcm27xx-bcm2712
 FROM openwrt/sdk:${SDK_TAG}
 
+# Install gperf (needed by libseccomp which is a runc dependency)
+USER root
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf && rm -rf /var/lib/apt/lists/*
+
 USER buildbot
 WORKDIR /builder
 
@@ -16,12 +20,14 @@ CMD ["bash", "-c", "\
   ./scripts/feeds update packages && \
   make defconfig && \
   bash /scripts/update_versions.sh && \
-  ./scripts/feeds install docker dockerd containerd runc docker-compose && \
+  ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp tini && \
   make defconfig && \
+  make package/libseccomp/compile -j$(nproc) V=s && \
+  make package/tini/compile -j$(nproc) V=s && \
   make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
-  make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
-  make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
+  make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   mkdir -p /output && \
   for ext in ipk apk; do \
