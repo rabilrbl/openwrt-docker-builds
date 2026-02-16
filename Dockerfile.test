@@ -15,6 +15,13 @@ CMD ["bash", "-c", "\
   if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
   ./scripts/feeds update packages && \
   make defconfig && \
+  echo 'Upgrading Golang feed to latest...' && \
+  rm -rf feeds/packages/lang/golang && \
+  git clone --depth 1 --filter=blob:none --sparse https://github.com/openwrt/packages.git /tmp/openwrt-packages && \
+  cd /tmp/openwrt-packages && git sparse-checkout set lang/golang && cd /builder && \
+  cp -r /tmp/openwrt-packages/lang/golang feeds/packages/lang/golang && \
+  rm -rf /tmp/openwrt-packages && \
+  ./scripts/feeds install -f golang && \
   bash /scripts/update_versions.sh && \
   ./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker && \
   make defconfig && \
