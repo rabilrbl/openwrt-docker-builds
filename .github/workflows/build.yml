@@ -29,86 +29,52 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          # Added 'jq' for reliable JSON parsing and 'coreutils' for hash utilities (md5sum, sha256sum)
-          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
-            zlib1g-dev gawk git gettext libssl-dev xsltproc rsync wget unzip python3 qemu-utils zstd jq coreutils
+          sudo apt-get install -y jq
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache: false
-
-      - name: Resolve SDK URL
-        id: sdk_config
-        run: ./scripts/setup_sdk.sh resolve
-      - name: Download and Setup SDK
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: ./scripts/setup_sdk.sh setup
-
-      - name: Configure Git for large repositories
+      - name: Resolve SDK Docker Tag
+        id: sdk_tag
         run: |
-          git config --global http.postBuffer 524288000
-          git config --global http.lowSpeedLimit 0
-          git config --global http.lowSpeedTime 999999  # Effectively disable timeout
+          TARGET="${{ env.TARGET }}"
+          TAG="${TARGET//\//-}"
+          VERSION="${{ env.OPENWRT_VERSION }}"
+          if [ "$VERSION" != "snapshot" ]; then
+            TAG="${TAG}-v${VERSION}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using SDK image: openwrt/sdk:${TAG}"
 
-      - name: Update and install feeds with retry
-        working-directory: ./sdk
-        run: ../scripts/update_feeds.sh
-
-      - name: Upgrade Golang
-        working-directory: ./sdk
-        run: ../scripts/update_golang.sh
-
-      - name: Automate Version Updates
-        working-directory: ./sdk
+      - name: Build Packages in SDK Container
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ../scripts/update_versions.sh
-
-      - name: Register Packages
-        working-directory: ./sdk
-        run: ./scripts/feeds install docker dockerd containerd runc docker-compose
-
-      - name: Cache Ccache
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.ccache
-          key: ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
-            ${{ runner.os }}-openwrt-ccache-${{ env.OPENWRT_VERSION }}-
-
-      - name: Cache Build Artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            sdk/build_dir
-            sdk/staging_dir
-            sdk/dl
-          key: ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-${{ env.TARGET }}-
-            ${{ runner.os }}-openwrt-build-${{ env.OPENWRT_VERSION }}-
-
-      - name: Compile Packages
-        working-directory: ./sdk
-        env:
-          CCACHE_DIR: /home/runner/.ccache
-        run: ../scripts/compile.sh
-
-      - name: Collect Artifacts
         run: |
           mkdir -p output
-          for ext in ipk apk; do
-              find sdk/bin/packages -name "docker*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "dockerd*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "containerd*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "runc*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "docker-compose*.$ext" -exec cp {} output/ \;
-              find sdk/bin/packages -name "luci-lib-docker*.$ext" -exec cp {} output/ \;
-          done
-
+          docker run --rm \
+            -v "${{ github.workspace }}/scripts":/scripts:ro \
+            -v "${{ github.workspace }}/output":/output \
+            -e GH_TOKEN="${GH_TOKEN}" \
+            openwrt/sdk:${{ steps.sdk_tag.outputs.tag }} \
+            bash -c '
+              cd /builder &&
+              [ ! -d ./scripts ] && bash ./setup.sh;
+              git config --global http.postBuffer 524288000;
+              git config --global http.lowSpeedLimit 0;
+              git config --global http.lowSpeedTime 999999;
+              sed -i "s|git.openwrt.org/feed/|github.com/openwrt/|g" feeds.conf.default;
+              sed -i "s|git.openwrt.org/project/|github.com/openwrt/|g" feeds.conf.default;
+              bash /scripts/update_feeds.sh &&
+              bash /scripts/update_golang.sh &&
+              bash /scripts/update_versions.sh &&
+              bash /scripts/compile.sh &&
+              mkdir -p /output &&
+              for ext in ipk apk; do
+                find bin/packages -name "docker*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "dockerd*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "runc*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \;
+                find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} /output/ \;
+              done
+            '
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1

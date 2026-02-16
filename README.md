@@ -1,11 +1,12 @@
 # OpenWrt Docker Builds
 
-This repository provides automated builds of up-to-date Docker packages (docker, dockerd, containerd, runc) for OpenWrt routers using GitHub Actions.
+This repository provides automated builds of up-to-date Docker packages (docker, dockerd, containerd, runc) for OpenWrt routers using GitHub Actions and the [official OpenWrt SDK Docker image](https://hub.docker.com/r/openwrt/sdk).
 
 ## 🎯 Purpose
 
 The official OpenWrt Docker packages are often outdated and lag behind the latest Docker releases. This repository automatically:
 
+- ✅ Uses the **official OpenWrt SDK Docker image** (`openwrt/sdk`) for reproducible builds
 - ✅ Fetches the **latest Docker, Dockerd, and Containerd versions** from their respective GitHub repositories
 - ✅ Builds packages for your specific OpenWrt architecture
 - ✅ Publishes pre-compiled packages as GitHub releases
@@ -190,11 +191,13 @@ All versions are automatically fetched from the latest GitHub releases of:
 
 ## 🛠️ How It Works
 
-1. **Downloads the OpenWrt SDK** for your target architecture
+1. **Pulls the official OpenWrt SDK Docker image** (`openwrt/sdk`) for your target architecture
 2. **Fetches the latest versions** of Docker, Dockerd, and Containerd from GitHub
 3. **Updates the Makefile** package definitions with the latest versions
-4. **Compiles the packages** using the OpenWrt build system
+4. **Compiles the packages** using the OpenWrt build system inside the SDK container
 5. **Publishes the files** as a GitHub release
+
+For more details about the official OpenWrt SDK Docker image, see https://github.com/openwrt/docker
 
 ## ⚠️ Troubleshooting
 

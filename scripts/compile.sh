@@ -8,7 +8,7 @@ if [ ! -f "scripts/feeds" ]; then
 fi
 
 echo "Installing targets..."
-./scripts/feeds install docker dockerd containerd runc luci-lib-docker
+./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker
 make defconfig
 
 # Enable ccache for faster builds
