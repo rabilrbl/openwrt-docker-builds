@@ -357,6 +357,19 @@ if [ -f "$MAKEFILE_DIR/dockerd/Makefile" ]; then
     # Add kmod-ipt-raw dependency (needed for Docker networking)
     if ! grep -q 'kmod-ipt-raw' "$MAKEFILE_DIR/dockerd/Makefile"; then
         echo "Patching dockerd Makefile to add kmod-ipt-raw dependency..."
-        sed -i 's/+kmod-ipt-nat \\/+kmod-ipt-nat \\\n    +kmod-ipt-raw \\/' "$MAKEFILE_DIR/dockerd/Makefile"
+
+        # Try multiple patterns to handle different Makefile formats
+        # Pattern 1: +kmod-ipt-nat with backslash continuation (most common)
+        if grep -q '+kmod-ipt-nat \\' "$MAKEFILE_DIR/dockerd/Makefile"; then
+            sed -i 's/+kmod-ipt-nat \\/+kmod-ipt-nat \\\n    +kmod-ipt-raw \\/' "$MAKEFILE_DIR/dockerd/Makefile"
+        # Pattern 2: +kmod-ipt-nat at end of line (no backslash)
+        elif grep -q '+kmod-ipt-nat$' "$MAKEFILE_DIR/dockerd/Makefile"; then
+            sed -i 's/+kmod-ipt-nat$/+kmod-ipt-nat \\\n    +kmod-ipt-raw/' "$MAKEFILE_DIR/dockerd/Makefile"
+        # Pattern 3: +kmod-ipt-nat with space (inline format)
+        elif grep -q '+kmod-ipt-nat ' "$MAKEFILE_DIR/dockerd/Makefile"; then
+            sed -i 's/+kmod-ipt-nat /+kmod-ipt-nat +kmod-ipt-raw /' "$MAKEFILE_DIR/dockerd/Makefile"
+        else
+            echo "  Warning: Could not find +kmod-ipt-nat in expected format"
+        fi
     fi
 fi
