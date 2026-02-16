@@ -44,6 +44,21 @@ get_commit_sha() {
     fi
 }
 
+# Get required Go version from a repo's go.mod
+get_go_version() {
+    local repo="$1"
+    local tag="$2"
+    local go_ver
+    go_ver=$(curl -sL "https://raw.githubusercontent.com/$repo/$tag/go.mod" \
+        | grep -m1 '^go ' | awk '{print $2}')
+    echo "$go_ver"
+}
+
+# Compare two version strings, return 0 if $1 >= $2
+version_ge() {
+    [ "$(printf '%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
+}
+
 update_makefile() {
     PKG_NAME=$1
     NEW_VERSION=$2
