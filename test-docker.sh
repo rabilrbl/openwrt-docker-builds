@@ -24,6 +24,7 @@ echo "  Target: $TARGET"
 echo "  SDK Image: openwrt/sdk:${SDK_TAG}"
 
 mkdir -p output
+chmod 777 output
 
 docker run --rm \
     -v "$(pwd)/output":/output \

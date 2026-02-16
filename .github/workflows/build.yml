@@ -43,6 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p output
+          chmod 777 output
           docker run --rm \
             -v "${{ github.workspace }}/scripts":/scripts:ro \
             -v "${{ github.workspace }}/output":/output \
