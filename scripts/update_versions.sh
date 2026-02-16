@@ -353,4 +353,10 @@ if [ -f "$MAKEFILE_DIR/dockerd/Makefile" ]; then
     echo "Patching dockerd Makefile to skip vendored version checks..."
     # Replace the entire Build/Prepare block with just the default prepare
     sed -i '/^define Build\/Prepare$/,/^endef$/c\define Build/Prepare\n\t\$(Build/Prepare/Default)\nendef' "$MAKEFILE_DIR/dockerd/Makefile"
+
+    # Add kmod-ipt-raw dependency (needed for Docker networking)
+    if ! grep -q 'kmod-ipt-raw' "$MAKEFILE_DIR/dockerd/Makefile"; then
+        echo "Patching dockerd Makefile to add kmod-ipt-raw dependency..."
+        sed -i 's/+kmod-ipt-nat \\/+kmod-ipt-nat \\\n    +kmod-ipt-raw \\/' "$MAKEFILE_DIR/dockerd/Makefile"
+    fi
 fi
