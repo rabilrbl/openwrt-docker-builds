@@ -239,9 +239,13 @@ upgrade_golang_feed() {
     make defconfig
 
     # Read full Go version from the upgraded feed Makefile
-    local go_mm go_patch go_full go_dir_name
+    local go_mm go_patch go_full
     go_mm=$(grep '^GO_VERSION_MAJOR_MINOR:=' "$GOLANG_DIR"/golang*/Makefile 2>/dev/null \
         | head -1 | sed 's/.*:=//')
+    if [ -z "$go_mm" ]; then
+        echo "  Error: Could not read GO_VERSION_MAJOR_MINOR from feed Makefile"
+        return 1
+    fi
     go_patch=$(grep '^GO_VERSION_PATCH:=' "$GOLANG_DIR"/golang*/Makefile 2>/dev/null \
         | head -1 | sed 's/.*:=//')
     if [ -n "$go_patch" ] && [ "$go_patch" != "0" ]; then
@@ -258,6 +262,7 @@ upgrade_golang_feed() {
         x86_64)  host_arch="amd64" ;;
         aarch64) host_arch="arm64" ;;
         armv*)   host_arch="armv6l" ;;
+        *)       echo "  Error: Unsupported architecture: $host_arch"; return 1 ;;
     esac
 
     echo "  Downloading pre-compiled Go ${go_full} (${host_os}-${host_arch})..."
@@ -267,7 +272,7 @@ upgrade_golang_feed() {
     # Remove old Go installation and install new one
     rm -rf "staging_dir/hostpkg/lib/go-"*
     mkdir -p "$go_root"
-    curl -sL "$go_url" | tar -xz -C "$go_root" --strip-components=1
+    curl -fSL "$go_url" | tar -xz -C "$go_root" --strip-components=1
 
     # Create symlinks expected by the SDK build system
     mkdir -p staging_dir/hostpkg/bin
