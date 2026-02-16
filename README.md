@@ -191,13 +191,19 @@ All versions are automatically fetched from the latest GitHub releases of:
 
 ## 🛠️ How It Works
 
-1. **Pulls the official OpenWrt SDK Docker image** (`openwrt/sdk`) for your target architecture
-2. **Fetches the latest versions** of Docker, Dockerd, and Containerd from GitHub
-3. **Updates the Makefile** package definitions with the latest versions
-4. **Compiles the packages** using the OpenWrt build system inside the SDK container
-5. **Publishes the files** as a GitHub release
+This repository uses the [official OpenWrt SDK Docker image](https://github.com/openwrt/docker) (`openwrt/sdk`) following the standard SDK workflow:
 
-For more details about the official OpenWrt SDK Docker image, see https://github.com/openwrt/docker
+```bash
+docker run --rm -v "$(pwd)"/bin/:/builder/bin openwrt/sdk
+# inside the Docker container
+[ ! -d ./scripts ] && ./setup.sh
+./scripts/feeds update packages
+make defconfig
+./scripts/feeds install <package>
+make package/<package>/{clean,compile} -j$(nproc)
+```
+
+The only addition is `scripts/update_versions.sh` which fetches the latest Docker, Containerd, and Runc versions from GitHub and patches the OpenWrt package Makefiles before compilation.
 
 ## ⚠️ Troubleshooting
 

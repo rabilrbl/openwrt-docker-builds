@@ -10,13 +10,12 @@ fi
 
 # --- Helper Functions ---
 get_latest_tag() {
-    # Uses GH_TOKEN if available, otherwise unauthenticated
     local auth_header=""
     if [ -n "$GH_TOKEN" ]; then
         auth_header="-H \"Authorization: token $GH_TOKEN\""
     fi
-    # Use eval to handle the quoted header string if present
-    eval curl -s $auth_header "https://api.github.com/repos/$1/releases/latest" | jq -r .tag_name
+    eval curl -s $auth_header "https://api.github.com/repos/$1/releases/latest" \
+        | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/'
 }
 
 get_tarball_hash() {
@@ -38,7 +37,8 @@ get_commit_sha() {
     if [ -n "$GH_TOKEN" ]; then
         auth_header="-H \"Authorization: token $GH_TOKEN\""
     fi
-    eval curl -s $auth_header "https://api.github.com/repos/$repo/commits/$tag" | jq -r .sha
+    eval curl -s $auth_header "https://api.github.com/repos/$repo/commits/$tag" \
+        | grep '"sha"' | head -1 | sed -E 's/.*"sha": *"([^"]+)".*/\1/'
 }
 
 update_makefile() {

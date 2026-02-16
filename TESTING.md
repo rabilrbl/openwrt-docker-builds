@@ -1,14 +1,12 @@
 # Testing OpenWrt Docker Builds Locally
 
-This repository uses the [official OpenWrt SDK Docker image](https://hub.docker.com/r/openwrt/sdk) (`openwrt/sdk`) to build packages. The test framework wraps this image with build scripts for local testing.
+This repository uses the [official OpenWrt SDK Docker image](https://hub.docker.com/r/openwrt/sdk) (`openwrt/sdk`) following the standard SDK workflow documented at https://github.com/openwrt/docker.
 
 ## Prerequisites
 
 - Docker installed on your machine.
 
 ## How to Run
-
-Use the `test-docker.sh` script to trigger a build:
 
 ```bash
 ./test-docker.sh [OPENWRT_VERSION] [TARGET]
@@ -33,14 +31,9 @@ Use the `test-docker.sh` script to trigger a build:
 
 ## What Happens
 
-1. **Image Build**: A Docker image (`openwrt-docker-builder`) is built using `Dockerfile.test`, which extends the official `openwrt/sdk` image for the specified target architecture.
-2. **Container Run**: The container starts and executes `scripts/local-build.sh`.
-3. **Build Process**:
-    - Runs the SDK's `setup.sh` to initialize the environment (if needed).
-    - Updates feeds and upgrades Golang.
-    - Fetches the latest Docker/Containerd versions from GitHub.
-    - Compiles the packages.
-4. **Artifacts**: The compiled packages (`.ipk` or `.apk` files) are copied to the `output/` directory on your host machine.
+1. Builds a Docker image extending `openwrt/sdk:<target-tag>`.
+2. Runs the official SDK setup (`setup.sh`), updates feeds, installs packages, and compiles — following the exact pattern from the [official SDK docs](https://github.com/openwrt/docker#sdk-example).
+3. Built packages (`.ipk` or `.apk`) are copied to `output/` on the host.
 
 ## SDK Docker Image Tags
 
@@ -50,5 +43,5 @@ The official `openwrt/sdk` image uses tags in the format:
 
 ## Troubleshooting
 
-- **Build Failures**: Check the console output. It mirrors the logs you would see in GitHub Actions.
-- **Image Pull Errors**: Ensure the `OPENWRT_VERSION` and `TARGET` combination has a corresponding SDK image on [Docker Hub](https://hub.docker.com/r/openwrt/sdk/tags).
+- **Build Failures**: Check the console output for error messages.
+- **Image Pull Errors**: Ensure the target/version combination has a corresponding SDK image on [Docker Hub](https://hub.docker.com/r/openwrt/sdk/tags).

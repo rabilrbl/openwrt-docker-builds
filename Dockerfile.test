@@ -4,9 +4,32 @@ FROM openwrt/sdk:${SDK_TAG}
 USER buildbot
 WORKDIR /builder
 
-# Copy build scripts
-COPY --chown=buildbot:buildbot scripts /builder/build-scripts
-RUN chmod +x /builder/build-scripts/*.sh
+# Copy only the version update script (the only custom script needed)
+COPY --chown=buildbot:buildbot scripts/update_versions.sh /scripts/update_versions.sh
+RUN chmod +x /scripts/update_versions.sh
 
-# Default command
-ENTRYPOINT ["/builder/build-scripts/local-build.sh"]
+# Build following the official SDK pattern:
+# https://github.com/openwrt/docker#sdk-example
+CMD bash -c '\
+  cd /builder && \
+  [ ! -d ./scripts ] && bash ./setup.sh; \
+  ./scripts/feeds update packages && \
+  make defconfig && \
+  bash /scripts/update_versions.sh && \
+  ./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker && \
+  make defconfig && \
+  make package/containerd/compile -j$(nproc) V=s && \
+  make package/dockerd/compile -j$(nproc) V=s && \
+  make package/docker/compile -j$(nproc) V=s && \
+  make package/runc/compile -j$(nproc) V=s && \
+  make package/docker-compose/compile -j$(nproc) V=s && \
+  make package/luci-lib-docker/compile -j$(nproc) V=s && \
+  mkdir -p /output && \
+  for ext in ipk apk; do \
+    find bin/packages -name "docker*.$ext" -exec cp {} /output/ \; ; \
+    find bin/packages -name "dockerd*.$ext" -exec cp {} /output/ \; ; \
+    find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \; ; \
+    find bin/packages -name "runc*.$ext" -exec cp {} /output/ \; ; \
+    find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \; ; \
+    find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} /output/ \; ; \
+  done'

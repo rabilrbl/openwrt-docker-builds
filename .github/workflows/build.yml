@@ -26,11 +26,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-
       - name: Resolve SDK Docker Tag
         id: sdk_tag
         run: |
@@ -55,16 +50,18 @@ jobs:
             openwrt/sdk:${{ steps.sdk_tag.outputs.tag }} \
             bash -c '
               cd /builder &&
-              [ ! -d ./scripts ] && bash ./setup.sh;
-              git config --global http.postBuffer 524288000;
-              git config --global http.lowSpeedLimit 0;
-              git config --global http.lowSpeedTime 999999;
-              sed -i "s|git.openwrt.org/feed/|github.com/openwrt/|g" feeds.conf.default;
-              sed -i "s|git.openwrt.org/project/|github.com/openwrt/|g" feeds.conf.default;
-              bash /scripts/update_feeds.sh &&
-              bash /scripts/update_golang.sh &&
+              [ ! -d ./scripts ] && bash ./setup.sh
+              ./scripts/feeds update packages &&
+              make defconfig &&
               bash /scripts/update_versions.sh &&
-              bash /scripts/compile.sh &&
+              ./scripts/feeds install docker dockerd containerd runc docker-compose luci-lib-docker &&
+              make defconfig &&
+              make package/containerd/compile -j$(nproc) V=s &&
+              make package/dockerd/compile -j$(nproc) V=s &&
+              make package/docker/compile -j$(nproc) V=s &&
+              make package/runc/compile -j$(nproc) V=s &&
+              make package/docker-compose/compile -j$(nproc) V=s &&
+              make package/luci-lib-docker/compile -j$(nproc) V=s &&
               mkdir -p /output &&
               for ext in ipk apk; do
                 find bin/packages -name "docker*.$ext" -exec cp {} /output/ \;

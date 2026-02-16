@@ -21,11 +21,10 @@ docker build \
 echo "Running build container..."
 echo "  OpenWrt Version: $OPENWRT_VERSION"
 echo "  Target: $TARGET"
-echo "  SDK Tag: $SDK_TAG"
+echo "  SDK Image: openwrt/sdk:${SDK_TAG}"
 
 mkdir -p output
 
-# Run the container with output mount
 docker run --rm \
     -v "$(pwd)/output":/output \
     "$IMAGE_NAME"
