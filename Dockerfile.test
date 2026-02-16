@@ -10,7 +10,7 @@ RUN chmod +x /scripts/update_versions.sh
 
 # Build following the official SDK pattern:
 # https://github.com/openwrt/docker#sdk-example
-CMD bash -c '\
+CMD ["bash", "-c", "\
   cd /builder && \
   if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
   ./scripts/feeds update packages && \
@@ -26,10 +26,10 @@ CMD bash -c '\
   make package/luci-lib-docker/compile -j$(nproc) V=s && \
   mkdir -p /output && \
   for ext in ipk apk; do \
-    find bin/packages -name "docker*.$ext" -exec cp {} /output/ \; ; \
-    find bin/packages -name "dockerd*.$ext" -exec cp {} /output/ \; ; \
-    find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \; ; \
-    find bin/packages -name "runc*.$ext" -exec cp {} /output/ \; ; \
-    find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \; ; \
-    find bin/packages -name "luci-lib-docker*.$ext" -exec cp {} /output/ \; ; \
-  done'
+    find bin/packages -name \"docker*.$ext\" -exec cp {} /output/ \\; ; \
+    find bin/packages -name \"dockerd*.$ext\" -exec cp {} /output/ \\; ; \
+    find bin/packages -name \"containerd*.$ext\" -exec cp {} /output/ \\; ; \
+    find bin/packages -name \"runc*.$ext\" -exec cp {} /output/ \\; ; \
+    find bin/packages -name \"docker-compose*.$ext\" -exec cp {} /output/ \\; ; \
+    find bin/packages -name \"luci-lib-docker*.$ext\" -exec cp {} /output/ \\; ; \
+  done"]
