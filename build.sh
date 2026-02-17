@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-OPENWRT_VERSION="${1:-snapshot}"
+DEFAULT_OPENWRT_VERSION="24.10.0"
+OPENWRT_VERSION="${1:-$DEFAULT_OPENWRT_VERSION}"
 TARGET="${2:-bcm27xx/bcm2712}"
 
 # Compute the SDK Docker image tag from target and version
@@ -16,7 +17,7 @@ echo "Building Docker image using openwrt/sdk:${SDK_TAG} as base..."
 docker build \
     --build-arg SDK_TAG="${SDK_TAG}" \
     -t "$IMAGE_NAME" \
-    -f Dockerfile.test .
+    -f Dockerfile .
 
 echo "Running build container..."
 echo "  OpenWrt Version: $OPENWRT_VERSION"

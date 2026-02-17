@@ -1,4 +1,4 @@
-ARG SDK_TAG=bcm27xx-bcm2712
+ARG SDK_TAG=bcm27xx-bcm2712-v24.10.0
 FROM openwrt/sdk:${SDK_TAG}
 
 # Install gperf (needed by libseccomp which is a runc dependency)
