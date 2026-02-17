@@ -57,17 +57,20 @@ You can trigger builds in two ways:
 
 **Automatic Weekly Builds:**
 
-The workflow automatically runs every Friday at midnight (UTC) with default settings:
+The workflow automatically runs every Sunday at midnight (UTC) with default settings:
 - OpenWrt Version: `stable` (latest stable release)
 - Target: `bcm27xx/bcm2712` (Raspberry Pi 5)
 
-You can edit `.github/workflows/build.yml` to change the default architecture or schedule.
+The weekly build workflow tracks deployments in GitHub, so you can view build history and status under the **Environments** section of your repository.
+
+You can edit `.github/workflows/weekly-build.yml` to change the default architecture or schedule.
 
 #### Step 4: Download Your Built Packages
 
 1. Wait for the workflow to complete (typically 20-40 minutes)
 2. Go to **Releases** in your forked repository
 3. Download the `.ipk` files from the latest release
+4. Optionally, check the **Environments** tab to see deployment history and status
 
 ## 📦 Supported Architectures
 
