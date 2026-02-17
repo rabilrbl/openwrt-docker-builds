@@ -20,10 +20,19 @@ CMD ["bash", "-c", "\
   ./scripts/feeds update packages && \
   make defconfig && \
   bash /scripts/update_versions.sh && \
-  ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp tini && \
+  ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp && \
+  if ./scripts/feeds install tini 2>/dev/null; then \
+    echo 'tini package found and installed'; \
+    TINI_AVAILABLE=1; \
+  else \
+    echo 'tini package not available, skipping'; \
+    TINI_AVAILABLE=0; \
+  fi && \
   make defconfig && \
   make package/libseccomp/compile -j$(nproc) V=s && \
-  make package/tini/compile -j$(nproc) V=s && \
+  if [ \"$TINI_AVAILABLE\" = \"1\" ]; then \
+    make package/tini/compile -j$(nproc) V=s || echo 'tini compilation failed, continuing'; \
+  fi && \
   make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
   make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s && \
