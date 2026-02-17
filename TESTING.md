@@ -9,24 +9,29 @@ This repository uses the [official OpenWrt SDK Docker image](https://hub.docker.
 ## How to Run
 
 ```bash
-./test-docker.sh [OPENWRT_VERSION] [TARGET]
+./build.sh [OPENWRT_VERSION] [TARGET]
 ```
 
 ### Examples
 
 **Build for Raspberry Pi 5 (Default):**
 ```bash
-./test-docker.sh
+./build.sh
 ```
 
-**Build for Raspberry Pi 4:**
+**Build for Raspberry Pi 4 with latest stable:**
 ```bash
-./test-docker.sh snapshot bcm27xx/bcm2711
+./build.sh stable bcm27xx/bcm2711
+```
+
+**Build for snapshot version:**
+```bash
+./build.sh snapshot bcm27xx/bcm2711
 ```
 
 **Build for a specific OpenWrt version:**
 ```bash
-./test-docker.sh 23.05.3 x86/64
+./build.sh 23.05.3 x86/64
 ```
 
 ## What Happens
