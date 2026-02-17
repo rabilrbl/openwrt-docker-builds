@@ -32,18 +32,18 @@ jobs:
         run: |
           ./build.sh "${{ env.OPENWRT_VERSION }}" "${{ env.TARGET }}"
 
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
         if: success()
         with:
-          tag_name: "docker-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}"
-          name: "Docker ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})"
-          files: output/*
-          body: |
-             **Target:** ${{ env.TARGET }}
-             **Components:**
-             * Docker CLI
-             * Dockerd (Docker Engine)
-             * Containerd
-             * Runc
-             * Docker Compose
+          name: OpenWrt-Docker-${{ env.OPENWRT_VERSION }}-build-${{ github.run_number }}
+          path: output/*
+
+      - name: Generate Summary
+        if: success()
+        run: |
+          echo "### Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "* **OpenWrt Version:** ${{ env.OPENWRT_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Target:** ${{ env.TARGET }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Components:** Docker CLI, Dockerd, Containerd, Runc, Compose" >> $GITHUB_STEP_SUMMARY
+
