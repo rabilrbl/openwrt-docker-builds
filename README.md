@@ -2,6 +2,8 @@
 
 This repository provides automated builds of up-to-date Docker packages (docker, dockerd, containerd, runc) for OpenWrt routers using GitHub Actions and the [official OpenWrt SDK Docker image](https://hub.docker.com/r/openwrt/sdk).
 
+[![Docker Build](https://github.com/rabilrbl/openwrt-docker-builds/actions/workflows/weekly-build.yml/badge.svg)](https://github.com/rabilrbl/openwrt-docker-builds/actions/workflows/weekly-build.yml)
+
 ## 🎯 Purpose
 
 The official OpenWrt Docker packages are often outdated and lag behind the latest Docker releases. This repository automatically:
