@@ -3,7 +3,7 @@ FROM openwrt/sdk:${SDK_TAG}
 
 # Install gperf (needed by libseccomp which is a runc dependency)
 USER root
-RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf libblkid-dev pkg-config && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf && rm -rf /var/lib/apt/lists/*
 
 USER buildbot
 WORKDIR /builder
