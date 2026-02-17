@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       openwrt_version:
-        description: 'OpenWrt Version (e.g., "snapshot" or "24.10.0")'
+        description: 'OpenWrt Version (e.g., "stable", "snapshot" or "24.10.0")'
         required: true
-        default: 'snapshot'
+        default: 'stable'
       target:
         description: 'Target Architecture'
         required: true
         default: 'bcm27xx/bcm2712'
 
 env:
-  OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || 'snapshot' }}
+  OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || 'stable' }}
   TARGET: ${{ github.event.inputs.target || 'bcm27xx/bcm2712' }}
 
 jobs:
@@ -26,63 +26,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve SDK Docker Tag
-        id: sdk_tag
-        run: |
-          TARGET="${{ env.TARGET }}"
-          TAG="${TARGET//\//-}"
-          VERSION="${{ env.OPENWRT_VERSION }}"
-          if [ "$VERSION" != "snapshot" ]; then
-            TAG="${TAG}-v${VERSION}"
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Using SDK image: openwrt/sdk:${TAG}"
-
-      - name: Prepare SDK Image
-        run: |
-          docker build -t openwrt-sdk-custom --build-arg SDK_TAG=${{ steps.sdk_tag.outputs.tag }} - <<'DOCKERFILE'
-          ARG SDK_TAG
-          FROM openwrt/sdk:${SDK_TAG}
-          USER root
-          RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends gperf && rm -rf /var/lib/apt/lists/*
-          USER buildbot
-          DOCKERFILE
-
-      - name: Build Packages in SDK Container
+      - name: Build Docker Packages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p output
-          chmod 777 output
-          docker run --rm \
-            -v "${{ github.workspace }}/scripts":/scripts:ro \
-            -v "${{ github.workspace }}/output":/output \
-            -e GH_TOKEN="${GH_TOKEN}" \
-            openwrt-sdk-custom \
-            bash -c '
-              cd /builder &&
-              if [ ! -d ./scripts ]; then bash ./setup.sh; fi &&
-              ./scripts/feeds update packages &&
-              make defconfig &&
-              bash /scripts/update_versions.sh &&
-              ./scripts/feeds install docker dockerd containerd runc docker-compose libseccomp tini &&
-              make defconfig &&
-              make package/libseccomp/compile -j$(nproc) V=s &&
-              make package/tini/compile -j$(nproc) V=s &&
-              make package/containerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/runc/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/docker/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/dockerd/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              make package/docker-compose/compile -j$(nproc) IGNORE_ERRORS=m V=s &&
-              mkdir -p /output &&
-              for ext in ipk apk; do
-                find bin/packages -name "docker*.$ext" -exec cp {} /output/ \;
-                find bin/packages -name "dockerd*.$ext" -exec cp {} /output/ \;
-                find bin/packages -name "containerd*.$ext" -exec cp {} /output/ \;
-                find bin/packages -name "runc*.$ext" -exec cp {} /output/ \;
-                find bin/packages -name "docker-compose*.$ext" -exec cp {} /output/ \;
-              done
-            '
+          ./build.sh "${{ env.OPENWRT_VERSION }}" "${{ env.TARGET }}"
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
