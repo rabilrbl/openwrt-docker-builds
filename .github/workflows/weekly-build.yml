@@ -84,6 +84,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           environment: openwrt-${{ env.TARGET }}
           initial-status: in_progress
+          environment-url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.check-version.outputs.moby_version }}-${{ env.TARGET }}-${{ needs.check-version.outputs.resolved_openwrt_version }}
           description: "Building Docker ${{ needs.check-version.outputs.moby_version }} for OpenWrt ${{ needs.check-version.outputs.resolved_openwrt_version }}"
 
       - name: Build Docker Packages
@@ -116,14 +117,15 @@ jobs:
         uses: chrnorm/deployment-status@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          environment-url: ${{ steps.deployment.outputs.environment_url }}
           deployment-id: ${{ steps.deployment.outputs.deployment_id }}
           state: success
-          environment-url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.check-version.outputs.moby_version }}-${{ env.TARGET }}-${{ needs.check-version.outputs.resolved_openwrt_version }}
 
       - name: Update deployment status (failure)
         if: failure()
         uses: chrnorm/deployment-status@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          environment-url: ${{ steps.deployment.outputs.environment_url }}
           deployment-id: ${{ steps.deployment.outputs.deployment_id }}
           state: failure
