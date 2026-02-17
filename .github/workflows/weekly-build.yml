@@ -1,0 +1,102 @@
+name: Weekly Docker Build Check
+
+on:
+  schedule:
+    # Run every Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if no new version'
+        required: false
+        type: boolean
+        default: false
+      openwrt_version:
+        description: 'OpenWrt Version (e.g., "stable", "snapshot" or "24.10.0")'
+        required: true
+        default: 'stable'
+      target:
+        description: 'Target Architecture'
+        required: true
+        default: 'bcm27xx/bcm2712'
+
+env:
+  OPENWRT_VERSION: ${{ github.event.inputs.openwrt_version || 'stable' }}
+  TARGET: ${{ github.event.inputs.target || 'bcm27xx/bcm2712' }}
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      build_needed: ${{ steps.check.outputs.BUILD_NEEDED }}
+      moby_version: ${{ steps.check.outputs.MOBY_VERSION }}
+      resolved_openwrt_version: ${{ steps.resolve.outputs.OPENWRT_VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for new Moby version
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          chmod +x scripts/check_new_version.sh
+          scripts/check_new_version.sh
+
+      - name: Override if force build
+        if: github.event.inputs.force_build == 'true'
+        run: |
+          echo "BUILD_NEEDED=true" >> $GITHUB_OUTPUT
+        id: force
+
+      - name: Resolve OpenWrt version
+        id: resolve
+        run: |
+          OPENWRT_VERSION="${{ env.OPENWRT_VERSION }}"
+          if [ "$OPENWRT_VERSION" = "stable" ]; then
+            echo "Resolving latest stable OpenWrt version..."
+            OPENWRT_VERSION=$(curl -s https://downloads.openwrt.org/releases/ | grep -oP 'href="\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' | sort -V | tail -1)
+            if [ -z "$OPENWRT_VERSION" ]; then
+              echo "Error: Could not resolve latest stable version"
+              exit 1
+            fi
+            echo "Resolved to: $OPENWRT_VERSION"
+          fi
+          echo "OPENWRT_VERSION=$OPENWRT_VERSION" >> $GITHUB_OUTPUT
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.build_needed == 'true' || github.event.inputs.force_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker Packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./build.sh "${{ env.OPENWRT_VERSION }}" "${{ env.TARGET }}"
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: "${{ needs.check-version.outputs.moby_version }}-${{ env.TARGET }}-${{ needs.check-version.outputs.resolved_openwrt_version }}"
+          name: "Docker ${{ needs.check-version.outputs.moby_version }} - ${{ env.TARGET }} - OpenWrt ${{ needs.check-version.outputs.resolved_openwrt_version }}"
+          files: output/*
+          body: |
+            **Moby Version:** ${{ needs.check-version.outputs.moby_version }}
+            **Target:** ${{ env.TARGET }}
+            **OpenWrt Version:** ${{ needs.check-version.outputs.resolved_openwrt_version }}
+
+            **Components:**
+            * Docker CLI
+            * Dockerd (Docker Engine)
+            * Containerd
+            * Runc
+            * Docker Compose
