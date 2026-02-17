@@ -14,7 +14,7 @@ This repository uses the [official OpenWrt SDK Docker image](https://hub.docker.
 
 ### Examples
 
-**Build for Raspberry Pi 5 (Default):**
+**Build for Raspberry Pi 5 (Default, latest stable):**
 ```bash
 ./build.sh
 ```

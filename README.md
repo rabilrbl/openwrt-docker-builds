@@ -51,14 +51,14 @@ You can trigger builds in two ways:
 1. Go to **Actions** → **Build Latest Docker for OpenWrt**
 2. Click **Run workflow**
 3. Configure your build:
-   - **OpenWrt Version**: Enter `24.10.0` (default) or another version/snapshot
+   - **OpenWrt Version**: Enter `stable` (default, auto-resolves) or specify a version/snapshot
    - **Target Architecture**: Enter your router's target (e.g., `bcm27xx/bcm2712`, `x86/64`, `ramips/mt7621`)
 4. Click **Run workflow**
 
 **Automatic Weekly Builds:**
 
 The workflow automatically runs every Friday at midnight (UTC) with default settings:
-- OpenWrt Version: `24.10.0`
+- OpenWrt Version: `stable` (latest stable release)
 - Target: `bcm27xx/bcm2712` (Raspberry Pi 5)
 
 You can edit `.github/workflows/build.yml` to change the default architecture or schedule.
