@@ -71,10 +71,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      deployments: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Create deployment
+        uses: chrnorm/deployment-action@v2
+        id: deployment
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: openwrt-${{ env.TARGET }}
+          initial-status: in_progress
+          description: "Building Docker ${{ needs.check-version.outputs.moby_version }} for OpenWrt ${{ needs.check-version.outputs.resolved_openwrt_version }}"
 
       - name: Build Docker Packages
         env:
@@ -100,3 +110,20 @@ jobs:
             * Containerd
             * Runc
             * Docker Compose
+
+      - name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: success
+          environment-url: https://github.com/${{ github.repository }}/releases/tag/${{ needs.check-version.outputs.moby_version }}-${{ env.TARGET }}-${{ needs.check-version.outputs.resolved_openwrt_version }}
+
+      - name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          state: failure
