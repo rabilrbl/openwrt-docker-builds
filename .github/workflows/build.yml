@@ -45,6 +45,7 @@ jobs:
           path: |
             sdk-cache/dl
             sdk-cache/staging_dir
+            !sdk-cache/staging_dir/toolchain-*
             sdk-cache/build_dir
           key: ${{ runner.os }}-sdk-${{ env.TARGET }}-${{ env.OPENWRT_VERSION }}-${{ hashFiles('scripts/update_versions.sh') }}
           restore-keys: |
