@@ -1,6 +1,5 @@
 # Build artifacts
 output/
-sdk-cache/
 # Legacy local test artifacts
 cache/
 sdk/

@@ -214,47 +214,6 @@ make package/<package>/{clean,compile} -j$(nproc)
 
 The only addition is `scripts/update_versions.sh` which fetches the latest Docker, Containerd, and Runc versions from GitHub and patches the OpenWrt package Makefiles before compilation.
 
-## ⚡ Build Caching
-
-This repository implements intelligent build caching to significantly speed up subsequent builds:
-
-### GitHub Actions Caching
-
-When building via GitHub Actions, the workflows automatically cache:
-
-1. **Docker Build Layers** - Docker buildx layer cache speeds up image building by reusing unchanged layers
-2. **SDK Downloaded Sources** (`dl/`) - Cached source tarballs for Docker, containerd, runc, and dependencies
-3. **SDK Build Artifacts** (`build_dir/`) - Compiled object files and intermediate build outputs
-4. **SDK Staging Directory** (`staging_dir/`) - Pre-compiled Go compiler and host tools
-
-**Cache Invalidation:** Caches are automatically invalidated when:
-- The target architecture or OpenWrt version changes
-- The Dockerfile or update_versions.sh script is modified
-- The cache becomes too old (GitHub Actions cache expires after 7 days of inactivity)
-
-**Benefits:**
-- First build: ~20-40 minutes (full compilation)
-- Subsequent builds with cache: ~5-15 minutes (depending on what changed)
-- Rebuilds with same versions can reuse all compilation artifacts
-
-### Local Build Caching
-
-When building locally with `./build.sh`, caching is automatically enabled:
-
-1. **Docker Buildx Cache** - If Docker buildx is available, layer caching is automatically used
-2. **SDK Artifacts** - Build artifacts are persisted in the `sdk-cache/` directory between builds
-
-To clear local caches and start fresh:
-```bash
-# Clear Docker buildx cache
-rm -rf /tmp/.buildx-cache
-
-# Clear SDK build cache
-rm -rf sdk-cache/
-```
-
-**Note:** The `sdk-cache/` directory can grow large (several GB) as it stores compiled packages and dependencies. It's automatically excluded from git via `.gitignore`.
-
 ## ⚠️ Troubleshooting
 
 ### Build Fails
