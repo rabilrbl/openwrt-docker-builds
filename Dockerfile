@@ -14,9 +14,18 @@ RUN chmod +x /scripts/update_versions.sh
 
 # Build following the official SDK pattern:
 # https://github.com/openwrt/docker#sdk-example
+# Note: Feed URLs are replaced with GitHub mirrors for improved reliability
+# Git buffer size increased to 500MB to handle large repository clones
 CMD ["bash", "-c", "\
   cd /builder && \
   if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
+  git config --global http.postBuffer 524288000 && \
+  sed -i -e 's|https://git.openwrt.org/feed/packages.git|https://github.com/openwrt/packages.git|g' \
+         -e 's|https://git.openwrt.org/project/luci.git|https://github.com/openwrt/luci.git|g' \
+         -e 's|https://git.openwrt.org/feed/luci.git|https://github.com/openwrt/luci.git|g' \
+         -e 's|https://git.openwrt.org/feed/routing.git|https://github.com/openwrt/routing.git|g' \
+         -e 's|https://git.openwrt.org/feed/telephony.git|https://github.com/openwrt/telephony.git|g' \
+         feeds.conf.default && \
   ./scripts/feeds update packages && \
   make defconfig && \
   bash /scripts/update_versions.sh && \
