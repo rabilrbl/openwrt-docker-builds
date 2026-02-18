@@ -17,6 +17,11 @@ RUN chmod +x /scripts/update_versions.sh
 CMD ["bash", "-c", "\
   cd /builder && \
   if [ ! -d ./scripts ]; then bash ./setup.sh; fi && \
+  git config --global http.postBuffer 524288000 && \
+  sed -i 's|https://git.openwrt.org/feed/packages.git|https://github.com/openwrt/packages.git|g' feeds.conf.default && \
+  sed -i 's|https://git.openwrt.org/feed/luci.git|https://github.com/openwrt/luci.git|g' feeds.conf.default && \
+  sed -i 's|https://git.openwrt.org/feed/routing.git|https://github.com/openwrt/routing.git|g' feeds.conf.default && \
+  sed -i 's|https://git.openwrt.org/feed/telephony.git|https://github.com/openwrt/telephony.git|g' feeds.conf.default && \
   ./scripts/feeds update packages && \
   make defconfig && \
   bash /scripts/update_versions.sh && \
