@@ -38,6 +38,7 @@ jobs:
         with:
           name: OpenWrt-Docker-${{ env.OPENWRT_VERSION }}-build-${{ github.run_number }}
           path: output/*
+          retention-days: 1
 
       - name: Generate Summary
         if: success()
